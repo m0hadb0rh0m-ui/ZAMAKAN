@@ -61,7 +61,9 @@ with sync_playwright() as p:
  page.locator('#weatherGrid').click()
  wait_until(lambda: 'وقت النموذج' in page.locator('#weatherLayerStatus').inner_text() or 'تعذر' in page.locator('#weatherLayerStatus').inner_text(),30)
  print('Weather grid:',page.locator('#weatherLayerStatus').inner_text(),flush=True)
+ assert 'وقت النموذج' in page.locator('#weatherLayerStatus').inner_text(),'Weather grid failed'
  page.locator('#layersClose').click()
+ page.wait_for_timeout(1800)
  page.screenshot(path=OUT/'weather-grid.png')
  page.locator('#layersToggle').click()
  page.locator('#weatherClear').click()

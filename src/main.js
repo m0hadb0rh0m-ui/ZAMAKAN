@@ -68,10 +68,12 @@ $('weatherGrid').onclick=async()=>{
  weatherGridAbort?.abort();const controller=new AbortController();weatherGridAbort=controller;
  $('weatherLayerStatus').textContent=tr('جارٍ طلب عينات النموذج…','Fetching model samples…');
  try{
+  // A model grid has much coarser resolution than a building map. Zoom out before sampling.
+  if(map.getZoom()>9)map.jumpTo({zoom:9,pitch:0});
   const pts=sampleGrid(map.getBounds());const geo=await fetchWeatherGrid(pts,controller.signal);
   if(controller.signal.aborted)return;
   weatherGridData=geo;syncWeatherGrid();$('weatherLayerStatus').textContent=geo.features.length?tr('عينات نموذجية نقطية، وليست قياسات ميدانية أو خريطة مستمرة. وقت النموذج: ','Discrete model samples, not observations or a continuous map. Model time: ')+date(geo.features[0].properties.time):tr('لا توجد بيانات','No data');
- }catch(e){if(!controller.signal.aborted)$('weatherLayerStatus').textContent=tr('تعذر تحميل العينات. كبّر الخريطة إلى منطقة محددة ثم أعد المحاولة.','Samples unavailable. Zoom into a region and retry.');}
+ }catch(e){if(!controller.signal.aborted)$('weatherLayerStatus').textContent=tr('تعذر تحميل العينات. اختر نطاقًا إقليميًا ثم أعد المحاولة.','Samples unavailable. Choose a regional view and retry.');}
 };
 $('terrain').onchange=()=>{state.terrain=$('terrain').checked;if(mapReady)setTerrain(map,state.terrain);};
 $('compass').onclick=()=>map?.easeTo({bearing:0,pitch:0,duration:motion()});
