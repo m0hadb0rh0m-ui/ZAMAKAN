@@ -71,3 +71,7 @@ The public cloud and desktop release are not currently deployed or certified. Te
 
 ## 0.4 — Release candidate
 Adds persistent language/accessibility settings, local fonts, coherent vector icons, optional SQLite account backend, stronger security controls and updated NOAA space telemetry with civilian SGP4 second-by-second propagation. See [release candidate scope and security limitations](docs/UPGRADE-0.4.md).
+
+## 0.5.0 release
+
+See [scientific reliability and staging guide](docs/release-0.5.md). Public source health is available on the Node server at `/status`; OpenAPI at `/openapi.json`.

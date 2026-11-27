@@ -11,11 +11,11 @@ export function compareModels(rows,at,hours=24){
   const fields=Object.fromEntries(MODEL_FIELDS.map(([k,u])=>[k,time.map(t=>{
    const value=h?.[k]?.[index.get(t)];return units?.[k]===u&&Number.isFinite(value)?value:null;
   })]));
-  return {id,name,state:result?.state||'unavailable',retrieved:result?.retrieved||null,fields};
+  return {id,name,state:result?.state||'unavailable',retrieved:result?.retrieved||null,source:result?.source||'Open-Meteo',sourceUrl:result?.sourceUrl||'https://api.open-meteo.com/v1/forecast',fields};
  });
  const spread=Object.fromEntries(MODEL_FIELDS.map(([k])=>[k,time.map((_,i)=>{const v=series.map(s=>s.fields[k][i]).filter(Number.isFinite);return v.length>1?Math.max(...v)-Math.min(...v):null;})]));
  return {time,series,spread};
 }
 export function comparisonCSV(data){
- return ['utc,model,state,temperature_c,wind_kmh,precipitation_mm,pressure_hpa',...data.time.flatMap((t,i)=>data.series.map(s=>[t,s.id,s.state,...MODEL_FIELDS.map(([k])=>s.fields[k][i]??'')].join(',')))].join('\n');
+ return ['utc,model,state,temperature_c,wind_kmh,precipitation_mm,pressure_hpa,source,retrieved_utc',...data.time.flatMap((t,i)=>data.series.map(s=>[t,s.id,s.state,...MODEL_FIELDS.map(([k])=>s.fields[k][i]??''),s.source,s.retrieved?new Date(s.retrieved).toISOString():''].join(',')))].join('\n');
 }

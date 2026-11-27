@@ -1,15 +1,15 @@
 // Windowed amplitude FFT + calibrated PSD; no assumptions about the sample's physical unit.
 import {spectrum} from './science.js';
-export function analyzeSignal(samples,rate,{window='hann',detrend=false}={}){
+export function analyzeSignal(samples,rate,{window='hann',detrend=false,transform=spectrum}={}){
  const n=samples.length;if(n<4||n>65536||!samples.every(Number.isFinite)||!Number.isFinite(rate)||rate<=0||!['rectangular','hann','hamming','blackman'].includes(window))throw Error('Invalid signal parameters');
  const mean=samples.reduce((a,b)=>a+b,0)/n,fftN=2**Math.ceil(Math.log2(n));
- let sum=0,sumSquares=0;const padded=Array(fftN).fill(0);
+ let sum=0,sumSquares=0;const padded=new Float64Array(fftN);
  for(let i=0;i<n;i++){
   const a=2*Math.PI*i/n;
   const w=window==='rectangular'?1:window==='hann'?.5-.5*Math.cos(a):window==='hamming'?.54-.46*Math.cos(a):.42-.5*Math.cos(a)+.08*Math.cos(2*a);
   sum+=w;sumSquares+=w*w;padded[i]=(samples[i]-(detrend?mean:0))*w;
  }
- const bins=spectrum(padded,rate).map((b,i)=>{
+ const bins=transform(padded,rate).map((b,i)=>{
   const edge=i===0||i===fftN/2,raw=b.amplitude*fftN/(edge?1:2),power=(edge?1:2)*raw*raw/(rate*sumSquares);
   return {...b,amplitude:b.amplitude*fftN/sum,powerDensity:power,relativeDb:0};
  });

@@ -58,13 +58,4 @@ export function buildings(raw){
   });
   return {type:'FeatureCollection',features};
 }
-export function parseCAP(xml,Parser=globalThis.DOMParser){
-  if(xml.length>500000||/<!DOCTYPE|<!ENTITY/i.test(xml))throw Error('Unsafe or oversized XML');
-  const d=new Parser().parseFromString(xml,'application/xml'), root=d.documentElement;
-  if(root.localName!=='alert'||root.namespaceURI!=='urn:oasis:names:tc:emergency:cap:1.2'||d.getElementsByTagName('parsererror').length)throw Error('Expected CAP 1.2 alert XML');
-  const get=(node,k)=>Array.from(node.children).find(x=>x.localName===k&&x.namespaceURI===root.namespaceURI)?.textContent.trim()||'';
-  const identifier=get(root,'identifier'),sender=get(root,'sender'),sent=get(root,'sent'),status=get(root,'status'),type=get(root,'msgType'),scope=get(root,'scope');
-  if(!identifier||!sender||!iso(sent)||!['Actual','Exercise','System','Test','Draft'].includes(status)||!['Alert','Update','Cancel','Ack','Error'].includes(type)||!['Public','Restricted','Private'].includes(scope))throw Error('Invalid CAP metadata');
-  const info=Array.from(root.children).filter(x=>x.localName==='info'&&x.namespaceURI===root.namespaceURI).map(x=>({...Object.fromEntries(['language','event','headline','description','instruction','severity','urgency','certainty','effective','onset','expires'].map(k=>[k,get(x,k)])),areas:Array.from(x.children).filter(y=>y.localName==='area'&&y.namespaceURI===root.namespaceURI).map(a=>({description:get(a,'areaDesc'),polygons:Array.from(a.children).filter(p=>p.localName==='polygon'&&p.namespaceURI===root.namespaceURI).map(p=>p.textContent.trim())}))}));
-  return {identifier,sender,sent,status,type,scope,references:get(root,'references'),info};
-}
+export {parseCAP} from './cap.js';

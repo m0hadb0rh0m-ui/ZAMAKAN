@@ -7,7 +7,7 @@ export function alertLifecycle(alert,now=Date.now()){
  const effective=(alert.info||[]).map(i=>Date.parse(iso(i.effective)||'invalid')).filter(Number.isFinite);
  if(effective.length&&(alert.info||[]).length===effective.length&&effective.every(t=>t>now))return 'not-yet-effective';
  if(!expires.length)return 'expiry-unknown';
- if(expires.every(t=>t<=now))return 'expired';
+ if(expires.every(t=>t<=now))return expires.length===(alert.info||[]).length?'expired':'expiry-unknown';
  return 'active-by-time';
 }
 export function nwsAlerts(raw,now=Date.now()){

@@ -62,3 +62,7 @@ button,input,select,textarea{font-family:inherit}button{min-height:44px}button:f
 .telemetry{border-top:1px solid var(--border);margin-top:12px;padding-top:8px}.telemetry h3{margin:4px 0 8px}.orbit-live-values{font-variant-numeric:tabular-nums;direction:ltr;color:var(--accent);padding:10px 0}
 nav button span{display:inline-flex;align-items:center;justify-content:center;flex:none;width:24px;height:24px;color:var(--accent)}
 .top button{display:inline-flex;align-items:center;justify-content:center;min-width:44px}.top button svg{flex:none}
+.lineage {font-size:.72rem;overflow-wrap:anywhere;color:var(--muted);margin-top:.3rem}
+.lineage summary {cursor:pointer;font-weight:600}
+.lineage[open] {padding-top:.2rem}
+.registry .row {gap:.6rem;align-items:center;flex-wrap:wrap}
