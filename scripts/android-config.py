@@ -13,8 +13,8 @@ tree.write(p,encoding='utf-8',xml_declaration=True)
 import re
 gradle=Path('android/app/build.gradle')
 s=gradle.read_text()
-s=re.sub(r'versionCode\s+\d+', 'versionCode 21', s)
-s=re.sub(r'versionName\s+"[^"]+"', 'versionName "2.1.0"', s)
+s=re.sub(r'versionCode\s+\d+', 'versionCode 22', s)
+s=re.sub(r'versionName\s+"[^"]+"', 'versionName "2.2.0"', s)
 gradle.write_text(s)
 
 # FCM stays entirely disabled for builds without a real project configuration.

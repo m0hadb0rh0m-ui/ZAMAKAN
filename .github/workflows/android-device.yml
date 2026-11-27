@@ -1,0 +1,47 @@
+name: Android emulator acceptance
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '24', cache: npm}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '21'}
+      - run: npm ci && npm test && npm run build && npx cap add android && python3 scripts/android-config.py && npx cap sync android
+      - working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Configure Android emulator
+        run: |
+          test -e /dev/kvm
+          sudo chmod 660 /dev/kvm
+          sudo chown "$USER" /dev/kvm
+          sdkmanager "system-images;android-35;google_apis;x86_64" "platform-tools" "emulator"
+          echo no | avdmanager create avd --force -n zamakan-ci -k 'system-images;android-35;google_apis;x86_64'
+      - name: Install, launch and detect crash
+        run: |
+          mkdir -p device-results
+          emulator -avd zamakan-ci -no-window -noaudio -no-boot-anim -gpu swiftshader_indirect > device-results/emulator.log 2>&1 &
+          trap 'adb emu kill || true' EXIT
+          timeout 180 adb wait-for-device
+          timeout 180 bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = 1 ]; do sleep 5; done'
+          adb shell input keyevent 82
+          adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+          adb logcat -c
+          adb shell am start -W -n org.zamakan.earth/.MainActivity | tee device-results/launch.txt
+          grep -q 'Status: ok' device-results/launch.txt
+          sleep 15
+          adb shell pidof org.zamakan.earth
+          adb logcat -d -s AndroidRuntime > device-results/runtime.log
+          if grep -q 'FATAL EXCEPTION' device-results/runtime.log; then exit 1; fi
+          adb exec-out screencap -p > device-results/screenshot.png
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: android-emulator-results, path: device-results/}

@@ -20,6 +20,7 @@ with sync_playwright() as p:
   data=[row(i,lat,lon) for i,(lat,lon) in enumerate(zip(latitudes,longitudes))]
   route.fulfill(json=data if len(data)>1 else data[0])
  page.route('https://api.open-meteo.com/v1/forecast?**',mock_forecast)
+ page.route('https://elevation-api.open-meteo.com/v1/elevation?**',lambda route:route.fulfill(json={'elevation':list(range(25))}))
  page.route('https://api.weather.gov/alerts/active',lambda route:route.fulfill(json={'type':'FeatureCollection','features':[]}))
  page.goto(BASE,wait_until='domcontentloaded',timeout=30000)
  assert page.locator('#nav button').count()==5
@@ -34,7 +35,7 @@ with sync_playwright() as p:
  page.locator('#lang').click()
  assert page.locator('html').get_attribute('dir')=='ltr'
  def go(tab):
-  group={'space':'observe','radar':'observe','weather':'observe','fft':'lab','models':'lab','cap':'lab','twin':'map','status':'more','ai':'more'}.get(tab,tab)
+  group={'space':'observe','radar':'observe','weather':'observe','fft':'lab','models':'lab','cap':'lab','twin':'map','status':'more','ai':'more','guide':'more'}.get(tab,tab)
   page.locator('#nav [data-tab='+group+']').click()
   if group!=tab: page.locator('#panel [data-tab='+tab+']').first.click()
  go('space')
@@ -68,6 +69,10 @@ with sync_playwright() as p:
  page.locator('#panel input[type=file]').set_input_files({'name':'test.geojson','mimeType':'application/geo+json','buffer':json.dumps(building).encode()})
  page.get_by_text('1 buildings · imported',exact=True).wait_for(timeout=15000)
  page.get_by_role('button',name='Remove layer').click()
+ page.get_by_label('End latitude').fill('31.36')
+ page.get_by_label('End longitude').fill('34.32')
+ page.get_by_role('button',name='Calculate profile').click()
+ page.get_by_text('Open-Meteo / Copernicus DEM GLO-90',exact=True).wait_for()
  go('cap')
  cap_xml='<alert xmlns="urn:oasis:names:tc:emergency:cap:1.2"><identifier>fixture</identifier><sender>example.test</sender><sent>2026-01-01T00:00:00-00:00</sent><status>Test</status><msgType>Alert</msgType><scope>Public</scope><info><category>Met</category><event>Fixture only</event><urgency>Expected</urgency><severity>Moderate</severity><certainty>Likely</certainty></info></alert>'
  page.locator('#panel input[type=file]').set_input_files({'name':'test.xml','mimeType':'application/xml','buffer':cap_xml.encode()})
@@ -110,6 +115,14 @@ with sync_playwright() as p:
  page.wait_for_timeout(800)
  assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
  page.screenshot(path='/tmp/zamakan-mobile.png')
+ go('guide')
+ assert page.locator('.guide-feature').count()==12
+ assert page.get_by_text('Start exploring ZAMAKAN',exact=True).is_visible()
+ assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
+ page.locator('#lang').click()
+ assert page.get_by_text('ابدأ رحلتك في زَمَكان',exact=True).is_visible()
+ page.locator('#lang').click()
+ go('earth')
  print(json.dumps({'browser':'Chromium','checks':'globe canvas, projection controls, RTL/LTR, timeline, FFT worker, grid particles and comparison (fixtures), imported 3D building, CAP XML and feed (fixture), AI disabled state, language settings, text sizes, map focus, mobile overflow','page_errors':errors,'status':page.locator('#panel').inner_text()[:1000]},ensure_ascii=False))
  assert not errors, errors
  b.close()

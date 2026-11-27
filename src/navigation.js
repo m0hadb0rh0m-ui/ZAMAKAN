@@ -15,6 +15,7 @@ export const modules=[
  ['twin','twin','المباني 3D','3D buildings','طبقات المباني والملفات','Buildings and file layers','map'],
  ['analysis','analysis','التحليل والتقارير','Analysis & reports','تحليل علمي وتصدير','Scientific analysis and export','more'],
  ['ai','ai','زَمَكان AI','ZAMAKAN AI','مساعد اختياري','Optional assistant','more'],
+ ['guide','sources','دليل الاستخدام','Start here','الميزات والتنزيل','Features and downloads','more'],
  ['sources','sources','المصادر','Sources','سجل البيانات والمراجع','Data registry and references','more'],
  ['status','status','حالة المصادر','Source health','فحوص الاتصال والحداثة','Connectivity and freshness','more']
 ];

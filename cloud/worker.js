@@ -10,7 +10,7 @@ const identity=req=>{const id=req.headers.get('oai-authenticated-user-id'),email
 async function body(req){if(!req.body||Number(req.headers.get('content-length'))>16384)throw Error('Body too large');const reader=req.body.getReader();let n=0,b=[];try{for(;;){const {done,value}=await reader.read();if(done)break;n+=value.byteLength;if(n>16384)throw Error('Body too large');b.push(value);}}finally{await reader.cancel().catch(()=>{});}const data=new Uint8Array(n);let o=0;for(const v of b){data.set(v,o);o+=v.length;}return JSON.parse(new TextDecoder().decode(data));}
 export async function handle(req,env){
  const url=new URL(req.url),path=url.pathname;
- if(path==='/health'&&req.method==='GET')return json(200,{status:'ok',version:'2.1.0',cloud:true,sync:!!env.DB});
+ if(path==='/health'&&req.method==='GET')return json(200,{status:'ok',version:'2.2.0',cloud:true,sync:!!env.DB});
  if(path==='/api/ai/status'&&req.method==='GET')return json(200,{enabled:false});
  if(path==='/api/flags'&&req.method==='GET')return json(200,{flags:flagsFromEnv()});
  if(path==='/api/auth/session'&&req.method==='GET'){const u=identity(req);return json(200,{enabled:true,provider:'chatgpt',user:u?{username:'ChatGPT'}:null,local:false});}
@@ -29,7 +29,7 @@ export async function handle(req,env){
  if(path.startsWith('/api/cap/feed/')&&req.method==='GET'){try{return json(200,await readAlertFeed(path.slice('/api/cap/feed/'.length)));}catch{return json(503,{error:'source-unavailable'});}}
  if(path.startsWith('/api/'))return json(404,{error:'not-found'});
  if(!['GET','HEAD'].includes(req.method))return json(405,{error:'method-not-allowed'});
- const key=path==='/'||path==='/status'?'/index.html':path;
+ const key=path==='/'||path==='/status'||path==='/guide'?'/index.html':path;
  if(!Object.hasOwn(ASSETS,key))return new Response('Not found',{status:404,headers:common});
  const a=ASSETS[key],headers={...common,'Content-Type':a[0],'Cache-Control':key.startsWith('/assets/')?'public, max-age=31536000, immutable':'no-cache'};
  if(key==='/sw.js')headers['Service-Worker-Allowed']='/';

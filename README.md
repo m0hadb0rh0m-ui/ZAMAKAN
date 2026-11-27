@@ -1,8 +1,32 @@
-# زَمَكان | ZAMAKAN 2.1.0 RC
+# زَمَكان | ZAMAKAN 2.2.0 RC
 Global Earth, Weather, Disaster & Space Intelligence
 
 **Research MVP — not a certified early warning or emergency system.**
 نواة تشغيلية فعلية وليست منظومة إنذار معتمدة. لا تستخدمها لاتخاذ قرارات إخلاء أو سلامة حرجة.
+
+## ابدأ هنا | Start here
+
+زَمَكان مرصد علمي للأرض والطقس والفضاء، للطلاب والباحثين والمهتمين. اختر موقعًا، افتح قسم الرصد أو المختبر، ثم اقرأ مصدر المعلومة ووقت استرجاعها.
+
+ZAMAKAN is an Earth, weather and space observatory for students, researchers and curious explorers. Choose a location, open a module, and check the source and timestamp.
+
+| الميزة / Feature | ماذا تفيدك؟ / What it does |
+|---|---|
+| الطقس / Weather | توقعات محلية ومقارنة IFS / GFS / ICON / location forecasts and model comparisons |
+| الخرائط والرياح / Maps & wind | طبقات متحركة من النماذج، صور مؤرخة ومقاييس / modeled wind, dated imagery and measurements |
+| الفضاء / Space | نشاط شمسي وحساب مدارات SGP4 / solar activity and estimated orbital positions |
+| التضاريس والمباني / Terrain & buildings | مشهد OSM وDEM ومقاطع ارتفاع تقريبية / 3D map and modeled elevation profiles |
+| CAP | دليل مصادر التحذيرات والتحقق البنيوي / source directory and structural checks, not certified warnings |
+| الإشارات / Signals | تحليل FFT وPSD وCSV / scientific signal analysis |
+| الحساب والمساعد / Account & AI | مزامنة اختيارية في السحابة، مساعد محلي اختياري / optional cloud sync and local assistant |
+
+### تنزيل وتجربة | Download and try
+
+- [حزم 2.1 التي اجتازت البناء / Verified 2.1 CI build](https://github.com/m0hadb0rh0m-ui/ZAMAKAN/actions/runs/46007182525): Android debug APK, unsigned release APK and Windows portable. GitHub sign-in may be required for artifacts.
+- [صفحة الإصدارات / Releases](https://github.com/m0hadb0rh0m-ui/ZAMAKAN/releases): distinguish signed production releases from explicitly marked previews.
+- [دليل المستخدم / User guide](docs/USER-GUIDE.md). Within the app use **More → Start here** or **المزيد ← دليل الاستخدام**.
+
+لا تثبّت حزمة غير موثوقة ولا تتجاوز حماية Windows أو Android. توقيع الإنتاج، إشعارات FCM، تغطية CAP الحية والتوأم الهندسي الكامل لم تُعتمد بعد.
 
 ## التشغيل المحلي (Windows / Linux / macOS)
 يتطلب Node.js 22.12+ (يفضل إصدار LTS حديث).

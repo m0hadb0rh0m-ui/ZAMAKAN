@@ -1,4 +1,4 @@
-export const GLOBAL_AUTHORITY_LINKS=[['WMO SWIC','https://severeweather.wmo.int/'],['WMO register','https://alertingauthority.wmo.int/'],['Meteoalarm Europe','https://meteoalarm.org/'],['WWMIWS marine warnings','https://wwmiws.wmo.int/']];
+export const GLOBAL_AUTHORITY_LINKS=[['WMO SWIC','https://severeweather.wmo.int/'],['WMO GMAS','https://worldweather.wmo.int/gmas/CAP-widget.html'],['WMO register','https://alertingauthority.wmo.int/'],['Meteoalarm Europe','https://meteoalarm.org/'],['WWMIWS marine warnings','https://wwmiws.wmo.int/']];
 export function parseAlertFeed(xml,Parser=globalThis.DOMParser){
  if(typeof xml!=='string'||xml.length>750000||/<!DOCTYPE|<!ENTITY/i.test(xml))throw Error('Unsafe or excessive feed');
  const d=new Parser().parseFromString(xml,'application/xml'),root=d.documentElement;

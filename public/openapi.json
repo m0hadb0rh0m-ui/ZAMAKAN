@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "ZAMAKAN HTTP API",
-    "version": "2.1.0"
+    "version": "2.2.0"
   },
   "paths": {
     "/health": {
@@ -1562,7 +1562,16 @@
               "enum": [
                 "au",
                 "de",
-                "in"
+                "in",
+                "nz",
+                "hk",
+                "nzc",
+                "al",
+                "bh",
+                "bw",
+                "eg",
+                "ng",
+                "om"
               ]
             }
           }
@@ -1579,7 +1588,8 @@
                     "sourceUrl",
                     "registry",
                     "retrieved",
-                    "xml"
+                    "xml",
+                    "state"
                   ],
                   "properties": {
                     "source": {
@@ -1597,6 +1607,16 @@
                     "xml": {
                       "type": "string",
                       "maxLength": 750000
+                    },
+                    "state": {
+                      "enum": [
+                        "fresh",
+                        "cached",
+                        "stale"
+                      ]
+                    },
+                    "error": {
+                      "type": "string"
                     }
                   },
                   "additionalProperties": false
