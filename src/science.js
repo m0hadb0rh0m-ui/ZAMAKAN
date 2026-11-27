@@ -1,4 +1,4 @@
-import {twoline2satrec,propagate,gstime,eciToGeodetic,degreesLat,degreesLong} from 'satellite.js';
+import {twoline2satrec,propagate,gstime,eciToGeodetic,degreesLat,degreesLong,eciToEcf,ecfToLookAngles,degreesToRadians} from 'satellite.js';
 import {validCoords,iso} from './data.js';
 
 export function spectrum(samples, rate=1) {
@@ -59,3 +59,13 @@ export function buildings(raw){
   return {type:'FeatureCollection',features};
 }
 export {parseCAP} from './cap.js';
+
+// Civil-satellite horizon passes: sampled geometry, not a guarantee of optical visibility.
+export function satellitePasses(record,observer,start=Date.now(),hours=24,minElevation=10){
+ if(!validCoords(observer.lon,observer.lat)||!Number.isFinite(start)||hours<1||hours>48||minElevation<0||minElevation>90)throw Error('Invalid pass parameters');
+ const station={latitude:degreesToRadians(observer.lat),longitude:degreesToRadians(observer.lon),height:0};
+ const result=[];let pass=null;
+ for(let t=start;t<=start+hours*3600000;t+=30000){if(Math.abs(t-record.epoch)>7*86400000)break;const d=new Date(t),p=propagate(record.sat,d);if(!p?.position)continue;const look=ecfToLookAngles(station,eciToEcf(p.position,gstime(d))),e=look.elevation*180/Math.PI;
+  if(e>=minElevation){if(!pass)pass={start:t,end:t,maxElevation:e,peak:t};pass.end=t;if(e>pass.maxElevation){pass.maxElevation=e;pass.peak=t;}}else if(pass){result.push(pass);pass=null;}}
+ if(pass)result.push(pass);return result.slice(0,40);
+}

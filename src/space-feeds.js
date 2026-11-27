@@ -1,3 +1,4 @@
+import {cacheGet,cachePut} from './offline-store.js';
 import {iso} from './data.js';
 import {json2satrec} from 'satellite.js';
 export const SPACE_FEEDS={
@@ -17,10 +18,10 @@ export function parseSpaceFeed(raw,type){
 }
 const cache=new Map(),requests=new Map();
 export async function fetchSpace(type,fetcher=globalThis.fetch){
- const conf=SPACE_FEEDS[type],old=cache.get(type);if(!conf)throw Error('Unknown space feed');
+ const conf=SPACE_FEEDS[type],old=cache.get(type)||(fetcher===globalThis.fetch?await cacheGet('space:'+type):null);if(!conf)throw Error('Unknown space feed');
  if(old&&Date.now()-old.retrieved<conf.ttl)return {...old,status:'cached'};
  if(requests.has(type))return requests.get(type);
- const task=(async()=>{try{const r=await fetcher(conf.url,{signal:AbortSignal.timeout(15000),credentials:'omit',referrerPolicy:'no-referrer'});if(!r.ok)throw Error('HTTP '+r.status);const rows=parseSpaceFeed(await r.json(),type),data={rows,retrieved:Date.now(),status:'available'};cache.set(type,data);return data;}catch{return old?{...old,status:'stale'}:{rows:[],retrieved:null,status:'unavailable'};}finally{requests.delete(type);}})();
+ const task=(async()=>{try{const r=await fetcher(conf.url,{signal:AbortSignal.timeout(15000),credentials:'omit',referrerPolicy:'no-referrer'});if(!r.ok)throw Error('HTTP '+r.status);const rows=parseSpaceFeed(await r.json(),type),data={rows,retrieved:Date.now(),status:'available'};cache.set(type,data);if(fetcher===globalThis.fetch)await cachePut('space:'+type,data);return data;}catch{return old?{...old,status:'stale'}:{rows:[],retrieved:null,status:'unavailable'};}finally{requests.delete(type);}})();
  requests.set(type,task);return task;
 }
 export const CIVIL_SATELLITES=[['25544','ISS'],['25994','Terra'],['27424','Aqua'],['43013','NOAA-20'],['54234','NOAA-21']];

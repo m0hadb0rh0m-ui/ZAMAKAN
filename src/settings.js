@@ -1,10 +1,10 @@
-const initial={lang:'ar',theme:'dark',font:'standard',motion:'system',auto:true};
+const initial={lang:'ar',theme:'dark',font:'standard',motion:'system',auto:true,lowData:false};
 export function getPreferences(){
- try{const p=JSON.parse(localStorage.getItem('zamakan.preferences')||'{}');return {...initial,lang:p.lang==='en'?'en':'ar',theme:p.theme==='light'?'light':'dark',font:p.font==='large'?'large':'standard',motion:p.motion==='reduced'?'reduced':'system',auto:p.auto!==false};}catch{return {...initial};}
+ try{const p=JSON.parse(localStorage.getItem('zamakan.preferences')||'{}');return {...initial,lang:p.lang==='en'?'en':'ar',theme:p.theme==='light'?'light':'dark',font:p.font==='large'?'large':'standard',motion:p.motion==='reduced'?'reduced':'system',auto:p.auto!==false,lowData:p.lowData===true};}catch{return {...initial};}
 }
 export function savePreferences(p){try{localStorage.setItem('zamakan.preferences',JSON.stringify(p));}catch{}}
 export function applyPreferences(p){
- document.documentElement.classList.toggle('light',p.theme==='light');document.documentElement.classList.toggle('large-text',p.font==='large');document.documentElement.classList.toggle('reduced-motion',p.motion==='reduced');
+ document.documentElement.classList.toggle('low-data',p.lowData);document.documentElement.classList.toggle('light',p.theme==='light');document.documentElement.classList.toggle('large-text',p.font==='large');document.documentElement.classList.toggle('reduced-motion',p.motion==='reduced');
 }
 const make=(t,text,cls)=>{const n=document.createElement(t);if(text)n.textContent=text;if(cls)n.className=cls;return n;};
 export function createSettings({state,apply}){
@@ -50,7 +50,7 @@ export function createSettings({state,apply}){
   dialog.replaceChildren();const header=make('div',null,'settings-header'),h=make('h2',tr('إعدادات زَمَكان','ZAMAKAN settings'));h.id='settings-title';const close=make('button','×');close.setAttribute('aria-label',tr('إغلاق','Close'));close.onclick=()=>dialog.close();header.append(h,close);dialog.append(header);
   const section=make('section',null,'settings-section');section.append(make('h3',tr('اللغة والمظهر','Language & appearance')));
   choice(section,tr('لغة التطبيق','Application language'),'lang',[['ar','العربية'],['en','English']]);choice(section,tr('المظهر','Theme'),'theme',[['dark',tr('داكن','Dark')],['light',tr('فاتح','Light')]]);choice(section,tr('حجم الخط','Text size'),'font',[['standard',tr('قياسي','Standard')],['large',tr('كبير','Large')]]);choice(section,tr('الحركة','Motion'),'motion',[['system',tr('إعداد النظام','System')],['reduced',tr('حركة أقل','Reduced')]]);
-  const l=make('label',null,'setting-toggle'),c=make('input');c.type='checkbox';c.checked=state.preferences.auto;c.onchange=()=>{state.preferences.auto=c.checked;apply();};l.append(c,document.createTextNode(tr('تحديث المصادر دوريًا حسب وتيرة كل مصدر','Refresh feeds periodically at source cadence')));section.append(l);dialog.append(section);account(dialog);
+  const l=make('label',null,'setting-toggle'),c=make('input');c.type='checkbox';c.checked=state.preferences.auto;c.onchange=()=>{state.preferences.auto=c.checked;apply();};l.append(c,document.createTextNode(tr('تحديث المصادر دوريًا حسب وتيرة كل مصدر','Refresh feeds periodically at source cadence')));section.append(l);const low=make('label',null,'setting-toggle'),lc=make('input');lc.type='checkbox';lc.checked=state.preferences.lowData;lc.onchange=()=>{state.preferences.lowData=lc.checked;apply();};low.append(lc,document.createTextNode(tr('وضع الاتصال الضعيف — تعطيل التحديث التلقائي','Low-data mode — pause automatic refresh')));section.append(low);dialog.append(section);account(dialog);
   dialog.append(make('p',tr('الساعة تتحرك كل ثانية؛ لا تتغير القياسات إلا عند صدورها من المصدر.','Clock updates every second; measurements change only when published by sources.'),'muted'));
  }
  return {open(){draw();if(!dialog.open)dialog.showModal();}};

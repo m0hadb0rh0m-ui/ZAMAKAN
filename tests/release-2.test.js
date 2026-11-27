@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {DOMParser} from '@xmldom/xmldom';
+import {destinations,modules,MAP_MODULES,groupFor} from '../src/navigation.js';
+import {polygonArea,solarElevation,parseGeoFile} from '../src/geo-tools.js';
+import {spectrogram,compareSignals} from '../src/dsp-extra.js';
+import {scalarRequest,decodeScalar} from '../src/scalar-grid.js';
+test('five primary destinations; non-geographic modules use independent screens',()=>{assert.equal(destinations.length,5);assert.equal(groupFor('weather'),'observe');assert.equal(groupFor('fft'),'lab');assert.ok(!MAP_MODULES.has('weather'));assert.ok(!MAP_MODULES.has('fft'));assert.equal(modules.filter(x=>['weather','disasters','space','air','marine','radar','fft','ai'].includes(x[0])).length,8);});
+test('approximate geodesic area and day/night geometry',()=>{let a=polygonArea([{lon:0,lat:0},{lon:1,lat:0},{lon:1,lat:1},{lon:0,lat:1}]);assert.ok(a>12300&&a<12400);let t=Date.parse('2026-03-20T12:00:00Z');assert.ok(solarElevation(0,0,t)>85);assert.ok(solarElevation(180,0,t)<-85);});
+test('local KML and GPX validation; reject entity declarations',()=>{let k='<kml xmlns="http://www.opengis.net/kml/2.2"><Placemark><Point><coordinates>34,31,0</coordinates></Point></Placemark></kml>';assert.deepEqual(parseGeoFile(k,'a.kml',DOMParser).features[0].geometry.coordinates,[34,31]);let g='<gpx xmlns="http://www.topografix.com/GPX/1/1"><wpt lat="31" lon="34"/></gpx>';assert.equal(parseGeoFile(g,'a.gpx',DOMParser).features.length,1);assert.throws(()=>parseGeoFile('<!DOCTYPE x>'+k,'x.kml',DOMParser));});
+test('STFT isolates known tone, comparison is deterministic',()=>{const a=Float64Array.from({length:1024},(_,i)=>Math.sin(2*Math.PI*8*i/64));const r=spectrogram(a,64,{size:64});assert.equal(r.binHz,1);assert.ok(r.power[8]>-1);assert.ok(r.power[20]<-35);const q=compareSignals(a,a);assert.ok(Math.abs(q.correlation-1)<1e-12);assert.equal(q.rmse,0);});
+test('regional scalar grid validates units and skips missing observations',()=>{const at=Date.parse('2026-11-27T12:00:00Z'),req=scalarRequest(34,31,'pressure',at);const raw=req.grid.points.map(([longitude,latitude],i)=>({longitude,latitude,location_id:i,hourly_units:{surface_pressure:'hPa'},hourly:{time:['2026-11-27T12:00'],surface_pressure:[i===0?null:1010]}}));assert.equal(decodeScalar(raw,req,at).features.length,24);assert.throws(()=>decodeScalar(raw.slice(1),req,at));});

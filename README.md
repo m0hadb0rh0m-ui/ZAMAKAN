@@ -1,4 +1,4 @@
-# زَمَكان | ZAMAKAN 0.1.0
+# زَمَكان | ZAMAKAN 2.0.0 RC
 Global Earth, Weather, Disaster & Space Intelligence
 
 **Research MVP — not a certified early warning or emergency system.**
@@ -75,3 +75,7 @@ Adds persistent language/accessibility settings, local fonts, coherent vector ic
 ## 0.5.0 release
 
 See [scientific reliability and staging guide](docs/release-0.5.md). Public source health is available on the Node server at `/status`; OpenAPI at `/openapi.json`.
+
+## 2.0 — Mobile-first research release candidate
+
+See [report implementation and release gates](docs/release-2.0.md) for scope, verified design decisions and remaining production dependencies.
