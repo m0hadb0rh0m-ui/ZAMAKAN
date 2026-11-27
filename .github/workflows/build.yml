@@ -1,7 +1,7 @@
 name: ZAMAKAN build
 on:
   push:
-    branches: [main]
+    branches: [main, feature/zamakan-ultra-map-ui]
   workflow_dispatch:
 permissions:
   contents: read
@@ -28,6 +28,11 @@ jobs:
           sleep 2
           python tests/browser_smoke.py
       - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ZAMAKAN-screenshots
+          path: /tmp/zamakan-screenshots/*
+      - uses: actions/upload-artifact@v4
         with:
           name: ZAMAKAN-web
           path: dist/
@@ -46,11 +51,13 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - run: npx cap add android
-      - run: npx cap sync android
+      - run: npm run android:init
+      - run: npm run android:sync
       - working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug bundleDebug --no-daemon
       - uses: actions/upload-artifact@v4
         with:
           name: ZAMAKAN-android-debug
-          path: android/app/build/outputs/apk/debug/*.apk
+          path: |
+            android/app/build/outputs/apk/debug/*.apk
+            android/app/build/outputs/bundle/debug/*.aab

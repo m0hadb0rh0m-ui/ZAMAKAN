@@ -1,4 +1,6 @@
 # Official source register — 2026-11-27
+
+**ULTRA update:** Current basemap and geocoding provider terms, optional MapTiler and NASA overlay setup are documented in [ULTRA](ULTRA.md). Natural Earth below is historical and no longer the basemap; browser cross-origin vector, feeds and search have been exercised.
 All URLs used by the application are in src/data.js. HTTP probes returned 200 for the six core feeds in this environment; browser cross-origin operation not yet verified. TTL is app refresh policy, not provider guarantee.
 
 | Source | Official docs | Data and coverage | Terms / cost / update |
