@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {earthquakes,hazards,kp,validCoords,distance,iso,weatherParams,nearestHour,eventsAt,fetchSource} from '../src/data.js';
+test('coordinate bounds and valid zero',()=>{assert(validCoords(0,0));assert(!validCoords(181,0));assert(!validCoords(0,NaN));assert(!validCoords('2',3));});
+test('USGS parser preserves missing magnitude and rejects invalid points',()=>{const rows=earthquakes({features:[{id:'a',properties:{time:1700000000000,mag:null},geometry:{coordinates:[10,20,30]}},{id:'b',properties:{time:0},geometry:{coordinates:[999,20]}}]});assert.equal(rows.length,1);assert.equal(rows[0].magnitude,null);assert.equal(rows[0].kind,'observed');});
+test('EONET newest point and explicit reported status',()=>{const a=hazards({events:[{id:'a',categories:[{id:'wildfires'}],geometry:[{type:'Point',coordinates:[1,2],date:'2025-01-01T00:00:00Z'},{type:'Point',coordinates:[3,4],date:'2025-01-02T00:00:00Z'}]}]});assert.equal(a[0].lon,3);assert.equal(a[0].kind,'reported');});
+test('Kp accepts current object and legacy table formats',()=>{assert.equal(kp([{time_tag:'2025-01-01T00:00:00',Kp:2}])[0].value,2);assert.equal(kp([['time_tag','Kp'],['2025-01-01 03:00:00','5.33']])[0].value,5.33);assert.equal(kp([{time_tag:'2025-01-01T00:00:00',Kp:null}]).length,0);});
+test('UTC timestamps and timeline',()=>{assert.equal(iso('2025-01-01T00:00:00'),'2025-01-01T00:00:00.000Z');assert.equal(eventsAt([{time:'2025-01-01T01:00:00Z'}],Date.parse('2025-01-01T00:00:00Z')).length,0);assert.equal(nearestHour({hourly:{time:['2025-01-01T01:00'],temperature_2m:[4]}},Date.parse('2025-01-01T00:45Z')).values.temperature_2m,4);});
+test('great-circle distance approximately 111.195 km per equatorial degree',()=>assert(Math.abs(distance({lat:0,lon:0},{lat:0,lon:1})-111.195)<.01));
+test('query validation',()=>{assert.throws(()=>weatherParams(200,0));assert.match(weatherParams(0,0),/latitude=0.000/);});
+test('network failure is not converted to fake data',async()=>{const r=await fetchSource('space','testfail',async()=>{throw Error('offline')});assert.equal(r.state,'unavailable');assert.equal(r.data,null);});
+test('deduplication and cache',async()=>{let n=0;const f=async()=>{n++;return {ok:true,json:async()=>[{time_tag:'2025-01-01T00:00:00',Kp:2}]}};let [a,b]=await Promise.all([fetchSource('space','dedup',f),fetchSource('space','dedup',f)]);assert.equal(n,1);assert.equal(a.data[0].value,b.data[0].value);assert.equal((await fetchSource('space','dedup',f)).state,'cached');});
+test('invalid payload rejected',()=>{assert.throws(()=>earthquakes({}));assert.throws(()=>hazards({}));assert.throws(()=>kp({}));});
