@@ -1,8 +1,34 @@
-# زَمَكان | ZAMAKAN 0.1.0
+# زَمَكان | ZAMAKAN 2.3.0 RC
 Global Earth, Weather, Disaster & Space Intelligence
 
 **Research MVP — not a certified early warning or emergency system.**
 نواة تشغيلية فعلية وليست منظومة إنذار معتمدة. لا تستخدمها لاتخاذ قرارات إخلاء أو سلامة حرجة.
+
+## ابدأ هنا | Start here
+
+زَمَكان مرصد علمي للأرض والطقس والفضاء، للطلاب والباحثين والمهتمين. اختر موقعًا، افتح قسم الرصد أو المختبر، ثم اقرأ مصدر المعلومة ووقت استرجاعها.
+
+ZAMAKAN is an Earth, weather and space observatory for students, researchers and curious explorers. Choose a location, open a module, and check the source and timestamp.
+
+| الميزة / Feature | ماذا تفيدك؟ / What it does |
+|---|---|
+| الطقس / Weather | توقعات محلية ومقارنة IFS / GFS / ICON / location forecasts and model comparisons |
+| الخرائط والرياح / Maps & wind | طبقات متحركة من النماذج، صور مؤرخة ومقاييس / modeled wind, dated imagery and measurements |
+| الفضاء / Space | نشاط شمسي وحساب مدارات SGP4 / solar activity and estimated orbital positions |
+| التضاريس والمباني / Terrain & buildings | مشهد OSM وDEM ومقاطع ارتفاع تقريبية / 3D map and modeled elevation profiles |
+| CAP | دليل مصادر التحذيرات والتحقق البنيوي / source directory and structural checks, not certified warnings |
+| الإشارات / Signals | تحليل FFT وPSD وCSV / scientific signal analysis |
+| الحساب والمساعد / Account & AI | مزامنة اختيارية في السحابة، مساعد محلي اختياري / optional cloud sync and local assistant |
+
+### تنزيل وتجربة | Download and try
+
+- [حزم 2.1 التي اجتازت البناء / Verified 2.1 CI build](https://github.com/m0hadb0rh0m-ui/ZAMAKAN/actions/runs/46007182525): Android debug APK, unsigned release APK and Windows portable. GitHub sign-in may be required for artifacts.
+- [صفحة الإصدارات / Releases](https://github.com/m0hadb0rh0m-ui/ZAMAKAN/releases): distinguish signed production releases from explicitly marked previews.
+- [دليل المستخدم / User guide](docs/USER-GUIDE.md). Within the app use **More → Start here** or **المزيد ← دليل الاستخدام**.
+
+لا تثبّت حزمة غير موثوقة ولا تتجاوز حماية Windows أو Android. توقيع الإنتاج، إشعارات FCM، تغطية CAP الحية والتوأم الهندسي الكامل لم تُعتمد بعد.
+
+**Google Play preparation:** [Data Safety worksheet](docs/GOOGLE-PLAY-DATA-SAFETY.md) · [privacy and data deletion](https://zamakan-observatory.racingdot32.chatgpt.site/privacy.html). CI builds an unsigned AAB; production signing requires the owner upload key.
 
 ## التشغيل المحلي (Windows / Linux / macOS)
 يتطلب Node.js 22.12+ (يفضل إصدار LTS حديث).
@@ -48,3 +74,38 @@ npx cap open android
 - [Proposed PostGIS schema](docs/schema.sql)
 
 Open-Meteo free tier is for non-commercial use. No billing authorized or activated.
+
+## 0.2 — Glass Control Center (research preview)
+- Glass dashboard with responsive navigation, accessible focus states, map focus and reset.
+- SGP4 ground tracks via satellite.js (user-provided, checksummed TLE; ±7 days of epoch, not live telemetry). See [CelesTrak](https://celestrak.org/NORAD/elements/).
+- RainViewer historical radar playback (coverage and availability vary). Point wind particles represent the selected **model** location only; no global gridded wind field.
+- Compare ECMWF IFS, NOAA GFS and DWD ICON at a common UTC hour and location.
+- FFT radix-2 one-sided spectrum (4–65,536 evenly spaced finite samples).
+- Read CAP 1.2 XML locally (unverified imports; no issuer authentication, live alert feed or notifications).
+- Extrude user-provided GeoJSON polygons with numeric metre heights. No automatically sourced city models, terrain fusion or real-time digital twin.
+- Optional local generative assistant through Ollama, disabled by default. Run a model already installed in Ollama, then start the production server with `ZAMAKAN_LOCAL_MODEL` set to that model's exact name. It is accessible only at `http://127.0.0.1:4173`. No live-data tools, no paid API, no automatic model download. Static/PWA and Android packages do not expose the local model endpoint.
+- Windows x64 portable EXE build job uses Electron; the artifact is unsigned and must be tested on Windows before distribution. Desktop currently denies permission requests including GPS.
+- Cloud-ready via the existing Dockerfile; actual hosting, HTTPS certificates and public URL are not provisioned.
+
+See [0.2 validation and limitations](docs/UPGRADE-0.2.md).
+
+## 0.3 — Scientific operations upgrade
+Supersedes the 0.2 feature descriptions above: regional sampled weather-model wind particles, UTC-aligned forecast charts, OSM vector building profiles, NWS alert integration, worker-based FFT/PSD, local AI snapshot grounding, Windows portable packaging checks and cloud deployment templates.
+[Full implementation, testing, deployment instructions and known limitations](docs/UPGRADE-0.3.md).
+
+The public cloud and desktop release are not currently deployed or certified. Test fixtures are not live measurements.
+
+## 0.4 — Release candidate
+Adds persistent language/accessibility settings, local fonts, coherent vector icons, optional SQLite account backend, stronger security controls and updated NOAA space telemetry with civilian SGP4 second-by-second propagation. See [release candidate scope and security limitations](docs/UPGRADE-0.4.md).
+
+## 0.5.0 release
+
+See [scientific reliability and staging guide](docs/release-0.5.md). Public source health is available on the Node server at `/status`; OpenAPI at `/openapi.json`.
+
+## 2.0 — Mobile-first research release candidate
+
+See [report implementation and release gates](docs/release-2.0.md) for scope, verified design decisions and remaining production dependencies.
+
+## 2.1 — Production pilot
+
+See [release and cloud operations](docs/release-2.1.md) for the hosted worker, account sync, CAP registry, 3D scene, optional FCM and verified-signature build workflow.

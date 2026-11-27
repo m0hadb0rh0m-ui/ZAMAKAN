@@ -1,5 +1,7 @@
+import {cacheGet,cachePut,clearCache} from './offline-store.js';
 export const SOURCES = {
  earthquakes:{name:'USGS',url:'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson',docs:'https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php',kind:'observed',ttl:90000},
+ earthquakesHistory:{name:'USGS',url:'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_month.geojson',docs:'https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php',kind:'observed',ttl:900000},
  hazards:{name:'NASA EONET',url:'https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=100',docs:'https://eonet.gsfc.nasa.gov/docs/v3',kind:'reported',ttl:900000},
  space:{name:'NOAA SWPC',url:'https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json',docs:'https://services.swpc.noaa.gov/products/',kind:'estimated',ttl:300000},
  weather:{name:'Open-Meteo',url:'https://api.open-meteo.com/v1/forecast',docs:'https://open-meteo.com/en/docs',kind:'forecast',ttl:900000},
@@ -30,25 +32,29 @@ export function kp(raw){
 export function weatherParams(lon,lat,kind='weather'){
  if(!validCoords(lon,lat))throw Error('Invalid coordinates');
  const p=new URLSearchParams({latitude:lat.toFixed(3),longitude:lon.toFixed(3),timezone:'GMT'});
- if(kind==='weather'){p.set('current','temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,cloud_cover,weather_code');p.set('hourly','temperature_2m,dew_point_2m,precipitation_probability,precipitation,wind_speed_10m,visibility,uv_index');p.set('forecast_days','3');p.set('past_days','1');}
- if(kind==='air')p.set('current','pm10,pm2_5,european_aqi,dust');
- if(kind==='marine')p.set('current','wave_height,wave_direction,wave_period');
+ if(kind==='weather'){p.set('current','temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,cloud_cover,weather_code');p.set('hourly','temperature_2m,relative_humidity_2m,dew_point_2m,precipitation_probability,precipitation,wind_speed_10m,visibility,uv_index,soil_moisture_0_to_1cm');p.set('daily','weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,uv_index_max,sunrise,sunset');p.set('forecast_days','7');p.set('past_days','1');}
+ if(kind==='air'){p.set('current','pm10,pm2_5,european_aqi,dust,uv_index');p.set('hourly','pm10,pm2_5,european_aqi,dust,uv_index');p.set('forecast_days','3');}
+ if(kind==='marine'){p.set('current','wave_height,wave_direction,wave_period,sea_surface_temperature,ocean_current_velocity,ocean_current_direction');p.set('hourly','wave_height,sea_surface_temperature,ocean_current_velocity');p.set('forecast_days','3');}
  return p.toString();
 }
 export function model(raw){if(!raw?.current||!iso(raw.current.time))throw Error('Invalid model response');return raw;}
 const memory=new Map(),inflight=new Map();
+export async function clearScientificCache(){memory.clear();await clearCache();}
+let lowData=false;export function setLowData(value){lowData=!!value;}
 export async function fetchSource(key,query='',fetcher=globalThis.fetch){
  const s=SOURCES[key];if(!s)throw Error('Unknown source');
- const id=key+'?'+query,old=memory.get(id),now=Date.now();
- if(old&&now-old.retrieved<s.ttl)return {...old,state:'cached'};
+ const id=key+'?'+query,now=Date.now();
+ let old=memory.get(id);if(!old&&fetcher===globalThis.fetch)old=await cacheGet(id);
+ if(old&&(now-old.retrieved<s.ttl||lowData&&now-old.retrieved<3*s.ttl))return {...old,state:now-old.retrieved<s.ttl?'cached':'stale'};
  if(inflight.has(id))return inflight.get(id);
  const task=(async()=>{try{
- const res=await fetcher(s.url+(query?(s.url.includes('?')?'&':'?')+query:''),{signal:AbortSignal.timeout(18000),credentials:'omit',referrerPolicy:'no-referrer'});
+ if(fetcher===globalThis.fetch&&globalThis.navigator?.onLine===false)throw Error('Offline');
+ const res=await fetcher(s.url+(query?(s.url.includes('?')?'&':'?')+query:''),{signal:AbortSignal.timeout(lowData?9000:18000),credentials:'omit',referrerPolicy:'no-referrer'});
  if(!res.ok)throw Error('HTTP '+res.status);
  const raw=await res.json();
- const data=key==='earthquakes'?earthquakes(raw):key==='hazards'?hazards(raw):key==='space'?kp(raw):model(raw);
- const result={data,state:'available',retrieved:Date.now(),source:s.name,kind:s.kind};memory.set(id,result);if(memory.size>48)memory.delete(memory.keys().next().value);return result;
- }catch(e){return old?{...old,state:'stale',error:String(e.message)}:{data:null,state:'unavailable',retrieved:null,source:s.name,kind:s.kind,error:String(e.message)};}
+ const data=key.startsWith('earthquakes')?earthquakes(raw):key==='hazards'?hazards(raw):key==='space'?kp(raw):model(raw);
+ const result={data,state:'available',retrieved:Date.now(),source:s.name,sourceUrl:s.url,kind:s.kind};memory.set(id,result);if(memory.size>48)memory.delete(memory.keys().next().value);if(fetcher===globalThis.fetch)await cachePut(id,result);return result;
+ }catch(e){return old?{...old,state:'stale',error:String(e.message)}:{data:null,state:'unavailable',retrieved:null,source:s.name,sourceUrl:s.url,kind:s.kind,error:String(e.message)};}
  finally{inflight.delete(id);}})();
  inflight.set(id,task);return task;
 }

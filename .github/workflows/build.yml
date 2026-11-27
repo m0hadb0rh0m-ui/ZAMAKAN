@@ -2,6 +2,8 @@ name: ZAMAKAN build
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -17,15 +19,17 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - run: node cloud/build.mjs && node tests/cloud-smoke.mjs && rm -rf dist/server
       - run: npm audit --audit-level=high
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install playwright
+      - run: pip install playwright jsonschema==4.26.0
       - run: python -m playwright install --with-deps chromium
       - run: |
-          npm run serve &
+          ZAMAKAN_SOURCE_MODE=mock npm run serve &
           sleep 2
+          python tests/api_contract.py
           python tests/browser_smoke.py
       - uses: actions/upload-artifact@v4
         with:
@@ -47,10 +51,81 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npx cap add android
+      - run: python3 scripts/android-config.py
       - run: npx cap sync android
       - working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug assembleRelease bundleRelease --no-daemon
       - uses: actions/upload-artifact@v4
         with:
           name: ZAMAKAN-android-debug
           path: android/app/build/outputs/apk/debug/*.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZAMAKAN-android-release-unsigned
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+      - name: Check Android App Bundle structure
+        run: |
+          test -s android/app/build/outputs/bundle/release/app-release.aab
+          unzip -t android/app/build/outputs/bundle/release/app-release.aab
+          unzip -l android/app/build/outputs/bundle/release/app-release.aab | grep 'base/manifest/AndroidManifest.xml'
+      - name: Rehearse AAB signing using disposable CI key (not for distribution)
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          export CI_TEMP_PASS="$(openssl rand -hex 24)"
+          keytool -genkeypair -alias ci-only -keyalg RSA -keysize 3072 -validity 1 -dname 'CN=EPHEMERAL CI TEST ONLY' -keystore "$work/test.p12" -storepass:env CI_TEMP_PASS -keypass:env CI_TEMP_PASS
+          cp android/app/build/outputs/bundle/release/app-release.aab "$work/test.aab"
+          jarsigner -keystore "$work/test.p12" -storepass:env CI_TEMP_PASS -keypass:env CI_TEMP_PASS -digestalg SHA-256 "$work/test.aab" ci-only
+          jarsigner -verify "$work/test.aab" | tee "$work/result.txt"
+          grep -q 'jar verified' "$work/result.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZAMAKAN-google-play-aab-unsigned
+          path: android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            desktop/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Stage desktop payload
+        shell: pwsh
+        run: |
+          Copy-Item -Recurse dist desktop/dist
+          Copy-Item -Recurse server desktop/server
+          Copy-Item -Recurse shared desktop/shared
+      - working-directory: desktop
+        run: npm ci
+      - working-directory: desktop
+        run: npm run package:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Launch packaged Windows app
+        shell: pwsh
+        run: |
+          $env:ZAMAKAN_SMOKE='1'
+          $p=Start-Process -FilePath desktop/release/win-unpacked/ZAMAKAN.exe -PassThru
+          if (-not $p.WaitForExit(45000)) { Stop-Process -Id $p.Id -Force; throw 'Desktop smoke timeout' }
+          if ($p.ExitCode -ne 0) { throw "Desktop smoke failed: $($p.ExitCode)" }
+      - name: Generate artifact checksums
+        shell: pwsh
+        run: Get-ChildItem desktop/release/*.exe | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" } | Set-Content desktop/release/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZAMAKAN-Windows-portable
+          path: |
+            desktop/release/*.exe
+            desktop/release/SHA256SUMS.txt
+          if-no-files-found: error

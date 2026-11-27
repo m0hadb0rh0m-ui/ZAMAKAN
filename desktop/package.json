@@ -1,0 +1,33 @@
+{
+  "name": "zamakan-desktop",
+  "version": "2.3.0",
+  "private": true,
+  "description": "ZAMAKAN research observatory for Windows",
+  "author": "ZAMAKAN",
+  "main": "main.cjs",
+  "scripts": {
+    "package:win": "electron-builder --win portable --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "45.5.0",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "org.zamakan.desktop",
+    "productName": "ZAMAKAN",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.cjs",
+      "package.json",
+      "server/**/*",
+      "dist/**/*",
+      "shared/**/*"
+    ],
+    "win": {
+      "target": "portable",
+      "artifactName": "ZAMAKAN-${version}-portable.${ext}"
+    }
+  }
+}

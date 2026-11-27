@@ -1,0 +1,38 @@
+name: Firebase real delivery test
+on:
+  workflow_dispatch:
+    inputs:
+      send:
+        description: 'Send actual research test to opted-in topic (otherwise validate only)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: firebase-delivery
+  cancel-in-progress: false
+jobs:
+  test:
+    # Only owner-approved protected branches/environments may access credential configuration.
+    if: github.ref == 'refs/heads/main'
+    environment: firebase-production
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '24'}
+      - uses: google-github-actions/auth@v3
+        id: auth
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_FCM_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/firebase.messaging
+          create_credentials_file: false
+      - name: Validate or send fixed research message
+        env:
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+          FCM_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          FCM_SEND: ${{ inputs.send }}
+        run: node scripts/send-fcm-test.mjs

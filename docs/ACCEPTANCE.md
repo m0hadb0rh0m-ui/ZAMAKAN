@@ -1,0 +1,20 @@
+# Production acceptance gates
+Passing CI is not equivalent to certification or hardware testing.
+- Firebase: owner creates/connects project for org.zamakan.earth, sets Firebase Android config in a protected repository secret, builds signed package, installs on real Android, grants Android notification permission, sends a data-only FCM HTTP v1 message with type=research-test while foreground/background and after reboot, verifies token rotation and opt-out. Record device/OS/result; never commit device tokens or service-account keys.
+- Android: owner-controlled secure keystore (retain backups); protected environment production-signing; run signed-release and verify signer and SHA256 before public release.
+- Windows: trusted Authenticode provider/certificate; existing signing workflow requires compatible credential. Validate Get-AuthenticodeSignature shows Valid with expected publisher, timestamp and actual physical Windows install.
+- CAP: source freshness, region coverage, cancellation references and official authority links; network outage must never imply no alerts. RSS is a directory, not authentication.
+- Terrain: compare against licensed surveyed geometry/elevations and disclose uncertainty.
+- Independent security: commission a scoped human penetration test of authentication, isolation, CSP, data access and mobile packages; remediate and retest. CodeQL and dependency scans are complementary.
+- Hardware: Android emulator and Windows runner smoke tests are not physical hardware field tests. Test Android permissions, FCM, network loss, low memory and RTL; Windows startup, GPU rendering, accessibility and signature on supported versions.
+
+## Production configuration
+Use GitHub Settings → Environments → production-signing with required reviewers and protected release branches. Store owner-controlled credentials there, never in chat or source. Android secrets: ANDROID_KEYSTORE_B64, ANDROID_STORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD; FCM: FIREBASE_ANDROID_CONFIG_B64 (Android google-services.json). Windows must use a trusted Authenticode certificate/provider compatible with the packaging tool; WIN_CSC_LINK and WIN_CSC_KEY_PASSWORD are environment secrets for a compatible certificate. Confirm trusted timestamp and expected publisher.
+Firebase compile CI uses a deliberate non-project fixture; no APK from this job is distributed. To validate delivery, use FCM HTTP v1 from a trusted environment with a short-lived OAuth token, target an opted-in device or research topic, and send data-only {"type":"research-test"}. Do not send notification payloads, which may bypass app opt-in handling in the background. Test opt-out after sending.
+CAP live workflow reports each registered feed's reachability independently; an empty RSS feed is not a guarantee of safety. Network failures do not generate fabricated alerts.
+
+## Google Play 2.3 gate
+- Build unsigned AAB automatically; use protected production-signing environment to sign with owner upload key, verify JAR signature, and produce SHA-256 hashes. Play App Signing remains an owner action.
+- Firebase real-delivery workflow requires a real project, Android package org.zamakan.earth, its client configuration, and protected `firebase-production` environment. Configure Workload Identity Federation for this repository/main branch only, service account with messaging permission, FIREBASE_PROJECT_ID, GCP_WORKLOAD_IDENTITY_PROVIDER and GCP_FCM_SERVICE_ACCOUNT variables. Validate first, then choose send explicitly; this fixed data-only message goes to the research topic opted into by users. Successful API acceptance is not handset delivery: inspect Settings → Research notifications → Last test notification received on a real device.
+- Privacy policy and data deletion page: verify public accessibility, private publisher contact, hosting retention and data safety worksheet before submission.
+- Google Play requirements: API 36+; verify 16KB compatibility; if applicable, closed test 12 testers continuously enrolled for 14 days; owner completes store listing and production access.
