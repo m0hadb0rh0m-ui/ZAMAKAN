@@ -11,7 +11,7 @@ if(!process.env.CESIUM_PUBLIC_TOKEN)fail('Cesium token missing');else try{
  const r=await fetch('https://api.cesium.com/v1/assets/2275207/endpoint',{headers:{...headers,Authorization:'Bearer '+token},signal:AbortSignal.timeout(12000),redirect:'error'});
  if(!r.ok){console.error('Cesium endpoint HTTP '+r.status);throw Error('access');}
  const endpoint=await r.json();
- if(!endpoint?.url){console.error('Cesium endpoint missing asset URL');throw Error('access');}
+ if(!(endpoint?.externalType==='3DTILES'?endpoint.options?.url:endpoint?.url)){console.error('Cesium endpoint missing asset URL');throw Error('access');}
  console.log('Cesium Google 3D asset authorized');
 }catch{fail('Cesium access');}
 console.log('No key was embedded in files. Provider access does not prove commercial rights.');
