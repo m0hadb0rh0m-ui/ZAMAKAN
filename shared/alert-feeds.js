@@ -1,5 +1,6 @@
 // Fixed registry; URLs sourced from WMO Register of Alerting Authorities. No arbitrary URL proxy.
 export const ALERT_FEEDS=Object.freeze({
+ gdacs:{name:'GDACS · global disaster reports',url:'https://www.gdacs.org/contentdata/xml/rss_24h.xml',registry:'https://www.gdacs.org/feed_reference.aspx'},
  au:{name:'Australia · Bureau of Meteorology',url:'https://severeweather.wmo.int/v2/cap-alerts/au-bom-en/rss.xml',registry:'https://alertingauthority.wmo.int/authorities.php?recId=6'},
  de:{name:'Germany · Deutscher Wetterdienst',url:'https://www.dwd.de/DWD/warnungen/cap-feed/en/rss.xml',registry:'https://alertingauthority.wmo.int/authorities.php?recId=58'},
  in:{name:'India · NDMA',url:'https://sachet.ndma.gov.in/cap_public_website/rss/rss_india.xml',registry:'https://alertingauthority.wmo.int/authorities.php?recId=331'}

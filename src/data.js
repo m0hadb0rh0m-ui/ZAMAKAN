@@ -1,3 +1,5 @@
+import {attachEnvelope} from './envelope.js';
+import {imageryTiles} from './imagery.js';
 import {decodeClimate} from './climate.js';
 import {cacheGet,cachePut,clearCache} from './offline-store.js';
 export const SOURCES = {
@@ -40,23 +42,28 @@ export function weatherParams(lon,lat,kind='weather'){
  return p.toString();
 }
 export function model(raw){if(!raw?.current||!iso(raw.current.time))throw Error('Invalid model response');return raw;}
+async function boundedJSON(res){
+ const reader=res.body.getReader(),chunks=[];let size=0;
+ try{for(;;){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>5000000)throw Error('Scientific payload exceeds 5 MB');chunks.push(value);}}finally{await reader.cancel().catch(()=>{});}
+ const bytes=new Uint8Array(size);let off=0;for(const c of chunks){bytes.set(c,off);off+=c.byteLength;}return JSON.parse(new TextDecoder().decode(bytes));
+}
 const memory=new Map(),inflight=new Map();
 export async function clearScientificCache(){memory.clear();await clearCache();}
 let lowData=false;export function setLowData(value){lowData=!!value;}
 export async function fetchSource(key,query='',fetcher=globalThis.fetch){
  const s=SOURCES[key];if(!s)throw Error('Unknown source');
  const id=key+'?'+query,now=Date.now();
- let old=memory.get(id);if(!old&&fetcher===globalThis.fetch)old=await cacheGet(id);
- if(old&&(now-old.retrieved<s.ttl||lowData&&now-old.retrieved<3*s.ttl))return {...old,state:now-old.retrieved<s.ttl?'cached':'stale'};
+ let old=memory.get(id);if(old){memory.delete(id);memory.set(id,old);}if(!old&&fetcher===globalThis.fetch)old=await cacheGet(id);
+ if(old&&(now-old.retrieved<s.ttl||lowData&&now-old.retrieved<3*s.ttl))return attachEnvelope(key,s,{...old,state:now-old.retrieved<s.ttl?'cached':'stale'},query);
  if(inflight.has(id))return inflight.get(id);
  const task=(async()=>{try{
  if(fetcher===globalThis.fetch&&globalThis.navigator?.onLine===false)throw Error('Offline');
  const res=await fetcher(s.url+(query?(s.url.includes('?')?'&':'?')+query:''),{signal:AbortSignal.timeout(lowData?9000:18000),credentials:'omit',referrerPolicy:'no-referrer'});
  if(!res.ok)throw Error('HTTP '+res.status);
- const raw=await res.json();
+ const raw=fetcher===globalThis.fetch&&res.body?await boundedJSON(res):await res.json();
  const data=key.startsWith('earthquakes')?earthquakes(raw):key==='hazards'?hazards(raw):key==='space'?kp(raw):key==='climate'?decodeClimate(raw,new URLSearchParams(query).get('start_date'),new URLSearchParams(query).get('end_date')):model(raw);
- const result={data,state:'available',retrieved:Date.now(),source:s.name,sourceUrl:s.url,kind:s.kind};memory.set(id,result);if(memory.size>48)memory.delete(memory.keys().next().value);if(fetcher===globalThis.fetch)await cachePut(id,result);return result;
- }catch(e){return old?{...old,state:'stale',error:String(e.message)}:{data:null,state:'unavailable',retrieved:null,source:s.name,sourceUrl:s.url,kind:s.kind,error:String(e.message)};}
+ const result=attachEnvelope(key,s,{data,state:'available',retrieved:Date.now(),source:s.name,sourceUrl:s.url,kind:s.kind},query);memory.set(id,result);if(memory.size>48)memory.delete(memory.keys().next().value);if(fetcher===globalThis.fetch)await cachePut(id,result);return result;
+ }catch(e){return attachEnvelope(key,s,old?{...old,state:'stale',error:String(e.message)}:{data:null,state:'unavailable',retrieved:null,source:s.name,sourceUrl:s.url,kind:s.kind,error:String(e.message)},query);}
  finally{inflight.delete(id);}})();
  inflight.set(id,task);return task;
 }
@@ -71,7 +78,4 @@ export async function geocode(name,language='ar',fetcher=globalThis.fetch){
  const d=await r.json();if(d.error)throw Error('Geocode API error');
  return (d.results||[]).filter(x=>validCoords(x.longitude,x.latitude)).map(x=>({name:String(x.name),country:String(x.country||x.country_code||''),admin:String(x.admin1||''),lon:x.longitude,lat:x.latitude}));
 }
-export function gibsTiles(day){
- if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||iso(day+'T00:00:00Z')?.slice(0,10)!==day||day>new Date().toISOString().slice(0,10)||day<'2000-02-24')throw Error('Invalid imagery date');
- return ['https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/'+day+'/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg'];
-}
+export function gibsTiles(day,id='terra'){return imageryTiles(day,id);}

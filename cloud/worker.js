@@ -10,7 +10,7 @@ const identity=req=>{const id=req.headers.get('oai-authenticated-user-id'),email
 async function body(req){if(!req.body||Number(req.headers.get('content-length'))>16384)throw Error('Body too large');const reader=req.body.getReader();let n=0,b=[];try{for(;;){const {done,value}=await reader.read();if(done)break;n+=value.byteLength;if(n>16384)throw Error('Body too large');b.push(value);}}finally{await reader.cancel().catch(()=>{});}const data=new Uint8Array(n);let o=0;for(const v of b){data.set(v,o);o+=v.length;}return JSON.parse(new TextDecoder().decode(data));}
 export async function handle(req,env){
  const url=new URL(req.url),path=url.pathname;
- if(path==='/health'&&req.method==='GET')return json(200,{status:'ok',version:'3.0.0-rc.1',cloud:true,sync:!!env.DB});
+ if(path==='/health'&&req.method==='GET')return json(200,{status:'ok',version:'3.0.0-rc.2',cloud:true,sync:!!env.DB});
  if(path==='/api/ai/status'&&req.method==='GET')return json(200,{enabled:false});
  if(path==='/api/flags'&&req.method==='GET')return json(200,{flags:flagsFromEnv()});
  if(path==='/api/auth/session'&&req.method==='GET'){const u=identity(req);return json(200,{enabled:true,provider:'chatgpt',user:u?{username:'ChatGPT'}:null,local:false});}

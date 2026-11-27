@@ -1,5 +1,5 @@
 import {iso} from './data.js';
-export const MODEL_IDS=[['ecmwf_ifs025','ECMWF IFS'],['ncep_gfs_global','NOAA GFS'],['icon_global','DWD ICON']];
+export const MODEL_IDS=[['ecmwf_ifs025','ECMWF IFS'],['ncep_gfs_global','NOAA GFS'],['icon_global','DWD ICON'],['ecmwf_aifs025_single','ECMWF AIFS']];
 export const MODEL_FIELDS=[['temperature_2m','°C'],['wind_speed_10m','km/h'],['precipitation','mm'],['surface_pressure','hPa']];
 export function compareModels(rows,at,hours=24){
  const first=Math.floor(at/3600000)*3600000;

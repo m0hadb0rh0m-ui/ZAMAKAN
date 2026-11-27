@@ -78,7 +78,7 @@ with sync_playwright() as p:
  page.get_by_role('button',name='Stop wind field').click()
  assert page.locator('.wind-overlay').count()==0
  go('models')
- page.get_by_role('button',name='Compare IFS / GFS / ICON').click()
+ page.get_by_role('button',name='Compare IFS / GFS / ICON / AIFS').click()
  page.get_by_text('Max model spread',exact=True).wait_for(timeout=15000)
  assert 'ECMWF IFS' in page.locator('#panel').inner_text()
  go('twin')

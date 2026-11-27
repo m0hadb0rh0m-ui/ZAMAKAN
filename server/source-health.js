@@ -8,7 +8,7 @@ const observedSeries=(d,fields,active=false)=>{if(!Array.isArray(d))throw Error(
 const forecast='?latitude=0&longitude=0&timezone=GMT&current=temperature_2m';
 export const PROBES=[
  ['usgs','USGS','https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson',180000,d=>{feature(d);if(!Number.isFinite(d.metadata?.generated))throw Error('timestamp');return d.metadata.generated;}],
- ['gdacs','GDACS','https://www.gdacs.org/xml/rss_24h.xml',900000,d=>{if(typeof d!=='string'||/<!DOCTYPE|<!ENTITY/i.test(d)||!/<rss(?:\s|>)/i.test(d)||!/<channel>/i.test(d)||!/<\/rss>/i.test(d))throw Error('schema');const channel=d.split(/<item(?:\s|>)/i,1)[0];return time(/<lastBuildDate>([^<]+)<\/lastBuildDate>/i.exec(channel)?.[1]||/<pubDate>([^<]+)<\/pubDate>/i.exec(channel)?.[1]||'');},'text'],
+ ['gdacs','GDACS','https://www.gdacs.org/contentdata/xml/rss_24h.xml',900000,d=>{if(typeof d!=='string'||/<!DOCTYPE|<!ENTITY/i.test(d)||!/<rss(?:\s|>)/i.test(d)||!/<channel>/i.test(d)||!/<\/rss>/i.test(d))throw Error('schema');const channel=d.split(/<item(?:\s|>)/i,1)[0];return time(/<lastBuildDate>([^<]+)<\/lastBuildDate>/i.exec(channel)?.[1]||/<pubDate>([^<]+)<\/pubDate>/i.exec(channel)?.[1]||'');},'text'],
  ['openmeteo','Open-Meteo','https://api.open-meteo.com/v1/forecast'+forecast,3600000,current],
  ['air','Open-Meteo / CAMS','https://air-quality-api.open-meteo.com/v1/air-quality?latitude=0&longitude=0&timezone=GMT&current=pm2_5',7200000,current],
  ['marine','Open-Meteo Marine','https://marine-api.open-meteo.com/v1/marine?latitude=0&longitude=0&timezone=GMT&current=wave_height',7200000,current],

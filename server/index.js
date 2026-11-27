@@ -48,7 +48,7 @@ export const server=createServer(async(req,res)=>{
    }catch{return json(503,{error:'Local model unavailable; verify Ollama and the configured model'});}finally{aiBusy=false;}
  }
  if(!['GET','HEAD'].includes(req.method))return send(405,'Method not allowed',{'Allow':'GET, HEAD'});
- const path=decodeURIComponent(new URL(req.url,'http://localhost').pathname);if(path==='/health')return send(200,JSON.stringify({status:'ok',version:'3.0.0-rc.1'}),{'Content-Type':'application/json'});
+ const path=decodeURIComponent(new URL(req.url,'http://localhost').pathname);if(path==='/health')return send(200,JSON.stringify({status:'ok',version:'3.0.0-rc.2'}),{'Content-Type':'application/json'});
  if(path.includes('\0')||path.includes('\\')||path.split('/').some(x=>x==='..'||x.startsWith('.')))return send(400,'Invalid path');
  const file=resolve(root,'.'+(['/','/status'].includes(path)?'/index.html':path));if(!file.startsWith(root+sep))return send(403,'Forbidden');
  const info=await stat(file);if(!info.isFile())return send(404,'Not found');
