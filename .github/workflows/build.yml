@@ -81,7 +81,7 @@ jobs:
           export ZAMAKAN_KEY_ALIAS=test
           trap 'rm -f "$ZAMAKAN_KEYSTORE_PATH"' EXIT
           keytool -genkeypair -storetype PKCS12 -keystore "$ZAMAKAN_KEYSTORE_PATH" -storepass:env ZAMAKAN_STORE_PASSWORD -keypass:env ZAMAKAN_KEY_PASSWORD -alias test -keyalg RSA -keysize 3072 -validity 2 -dname "CN=ZAMAKAN DISPOSABLE CI TEST"
-          export EXPECTED_UPLOAD_SHA256="$(keytool -list -v -keystore "$ZAMAKAN_KEYSTORE_PATH" -storepass:env ZAMAKAN_STORE_PASSWORD -alias test | awk -F 'SHA256: ' '/SHA256:/{print $2;exit}')"
+          export EXPECTED_UPLOAD_SHA256="$(keytool -exportcert -rfc -keystore "$ZAMAKAN_KEYSTORE_PATH" -storepass:env ZAMAKAN_STORE_PASSWORD -alias test | openssl x509 -noout -fingerprint -sha256 | cut -d= -f2)"
           node scripts/android-release.mjs
           (cd android && ./gradlew assembleRelease bundleRelease --no-daemon)
           bash scripts/verify-android-release.sh
