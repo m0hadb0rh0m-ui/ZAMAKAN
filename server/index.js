@@ -11,7 +11,7 @@ const csp="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 
 const configuredOrigins=new Set();for(const value of [process.env.WEATHER_PUBLIC_BASE,process.env.CLIENT_CONFIG_PUBLIC_URL]){try{const u=new URL(value||'');if(u.protocol==='https:'&&!u.username&&!u.password)configuredOrigins.add(u.origin);}catch{}}
 const effectiveCsp=configuredOrigins.size?csp.replace("connect-src 'self'","connect-src 'self' "+[...configuredOrigins].join(' ')):csp;
 const server=createServer(async(req,res)=>{
- const headers={'Content-Security-Policy':effectiveCsp,'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Frame-Options':'DENY','Permissions-Policy':'geolocation=(self), camera=(), microphone=()'};
+ const headers={'Content-Security-Policy':effectiveCsp,'X-Content-Type-Options':'nosniff','Referrer-Policy':'strict-origin-when-cross-origin','X-Frame-Options':'DENY','Permissions-Policy':'geolocation=(self), camera=(), microphone=()'};
  const send=(code,body,extra={})=>{res.writeHead(code,{...headers,...extra});res.end(req.method==='HEAD'?undefined:body);};
  try{
  const requestUrl=new URL(req.url,'http://localhost');
