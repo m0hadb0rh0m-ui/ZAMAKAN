@@ -19,6 +19,7 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - run: node cloud/build.mjs && node tests/cloud-smoke.mjs && rm -rf dist/server
       - run: npm audit --audit-level=high
       - uses: actions/setup-python@v5
         with:

@@ -1,3 +1,4 @@
+import {readAlertFeed} from '../shared/alert-feeds.js';
 import {createServer} from 'node:http';
 import {readFile,stat} from 'node:fs/promises';
 import {resolve,extname,sep} from 'node:path';
@@ -24,6 +25,7 @@ export const server=createServer(async(req,res)=>{
  const send=(code,body,extra={})=>{res.writeHead(code,{...headers,...extra});res.end(req.method==='HEAD'?undefined:body);};
  try{
  const reqPath=new URL(req.url,'http://localhost').pathname;
+ if(reqPath.startsWith('/api/cap/feed/')&&req.method==='GET'){try{const id=reqPath.slice('/api/cap/feed/'.length);const data=await readAlertFeed(id);return send(200,JSON.stringify(data),{'Content-Type':'application/json','Cache-Control':'no-store'});}catch{return send(503,JSON.stringify({error:'source-unavailable'}),{'Content-Type':'application/json','Cache-Control':'no-store'});}}
  if(reqPath==='/api/status'&&req.method==='GET')return send(200,JSON.stringify(await monitor.get()),{'Content-Type':'application/json','Cache-Control':'no-store'});
  if(reqPath==='/api/flags'&&req.method==='GET')return send(200,JSON.stringify({flags:await flagProvider.get()}),{'Content-Type':'application/json','Cache-Control':'no-store'});
  if(await auth.handle(req,res,reqPath))return;
@@ -46,7 +48,7 @@ export const server=createServer(async(req,res)=>{
    }catch{return json(503,{error:'Local model unavailable; verify Ollama and the configured model'});}finally{aiBusy=false;}
  }
  if(!['GET','HEAD'].includes(req.method))return send(405,'Method not allowed',{'Allow':'GET, HEAD'});
- const path=decodeURIComponent(new URL(req.url,'http://localhost').pathname);if(path==='/health')return send(200,JSON.stringify({status:'ok',version:'2.0.0'}),{'Content-Type':'application/json'});
+ const path=decodeURIComponent(new URL(req.url,'http://localhost').pathname);if(path==='/health')return send(200,JSON.stringify({status:'ok',version:'2.1.0'}),{'Content-Type':'application/json'});
  if(path.includes('\0')||path.includes('\\')||path.split('/').some(x=>x==='..'||x.startsWith('.')))return send(400,'Invalid path');
  const file=resolve(root,'.'+(['/','/status'].includes(path)?'/index.html':path));if(!file.startsWith(root+sep))return send(403,'Forbidden');
  const info=await stat(file);if(!info.isFile())return send(404,'Not found');

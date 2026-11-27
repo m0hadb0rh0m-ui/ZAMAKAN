@@ -1,7 +1,7 @@
 node_modules/
 dist/
 .env
-android/
+/android/
 *.keystore
 *.log
 
@@ -17,3 +17,9 @@ __pycache__/
 *.sqlite-shm
 *.sqlite-wal
 /state/
+
+cloud/assets.generated.js
+*.jks
+*.p12
+*.pfx
+google-services.json

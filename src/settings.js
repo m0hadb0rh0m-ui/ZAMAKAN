@@ -1,3 +1,6 @@
+import {pushAvailable,pushStatus,setPush} from './push.js';
+import {saveFavorites} from './navigation.js';
+import {validateUserState} from '../shared/user-state.js';
 const initial={lang:'ar',theme:'dark',font:'standard',motion:'system',auto:true,lowData:false};
 export function getPreferences(){
  try{const p=JSON.parse(localStorage.getItem('zamakan.preferences')||'{}');return {...initial,lang:p.lang==='en'?'en':'ar',theme:p.theme==='light'?'light':'dark',font:p.font==='large'?'large':'standard',motion:p.motion==='reduced'?'reduced':'system',auto:p.auto!==false,lowData:p.lowData===true};}catch{return {...initial};}
@@ -21,6 +24,14 @@ export function createSettings({state,apply}){
  }
  let mode='login',session=null;
  function message(e){return ({'invalid-credentials':tr('اسم المستخدم أو كلمة المرور غير صحيحة.','Invalid username or password.'),'registration-unavailable':tr('تعذر إنشاء الحساب بهذا الاسم.','Account registration unavailable.'),'invalid-credentials-format':tr('استخدم اسمًا إنجليزيًا من ٣–٣٢ حرفًا وكلمة مرور من ١٢ حرفًا على الأقل.','Use a 3–32 character Latin username and password of at least 12 characters.'),'rate-limit':tr('محاولات كثيرة. انتظر ١٥ دقيقة.','Too many attempts. Wait 15 minutes.'),'try-again':tr('الخادم مشغول. حاول لاحقًا.','Server busy. Try later.')})[e.message]||tr('تعذر الاتصال بخدمة الحسابات.','Account service unavailable.');}
+ function syncPanel(content){
+  const area=make('section',null,'settings-section'),title=make('h3',tr('مزامنة الحساب','Account sync')),info=make('p',tr('اختر رفع أو تنزيل تفضيلاتك ومواقعك المفضلة فقط. لا تُرسل بيانات GPS أو ملفاتك تلقائيًا.','Choose upload or download of preferences and favorites only. No automatic GPS history or file upload.'),'muted'),status=make('p',null,'settings-message');
+  const load=make('button',tr('استعادة النسخة المحفوظة','Restore saved state')),upload=make('button',tr('حفظ على الحساب','Save to account'));load.disabled=upload.disabled=true;let revision=null,snapshot=null;
+  const refresh=async()=>{load.disabled=upload.disabled=true;try{const d=await request('sync');revision=d.revision;snapshot=d.state;status.textContent=d.updated?tr('آخر نسخة: ','Last saved: ')+new Date(d.updated).toLocaleString():tr('لا توجد نسخة محفوظة','No saved state');load.disabled=!snapshot;upload.disabled=false;}catch(e){status.textContent=message(e);}};
+  load.onclick=()=>{if(!snapshot)return;const valid=validateUserState(snapshot);state.preferences=valid.preferences;state.favorites=valid.favorites;saveFavorites(state.favorites);apply();draw();};
+  upload.onclick=async()=>{upload.disabled=load.disabled=true;try{const r=await request('sync',{revision,state:validateUserState({preferences:state.preferences,favorites:state.favorites})});revision=r.revision;status.textContent=tr('تم الحفظ','Saved');await refresh();}catch(e){await refresh();status.textContent=e.message==='sync-conflict'?tr('تغيرت النسخة على جهاز آخر. راجعها قبل الحفظ مجددًا.','Saved state changed elsewhere. Review before saving again.'):message(e);}};
+  area.append(title,info,load,upload,status);content.append(area);refresh();
+ }
  function account(parent){
   const box=make('section',null,'settings-section');parent.append(box);box.append(make('h3',tr('الحساب والأمان','Account & security')));
   const content=make('div');box.append(content);
@@ -28,6 +39,11 @@ export function createSettings({state,apply}){
    content.replaceChildren();
    if(!session){content.append(make('p',tr('جارٍ التحقق من خدمة الحسابات…','Checking account service…'),'muted'));return;}
    if(!session.enabled){content.append(make('p',tr('وضع الضيف: تسجيل الحسابات يتطلب خادم ZAMAKAN مفعّلًا؛ لا تحفظ هذه النسخة كلمات مرور.','Guest mode: accounts require an enabled ZAMAKAN backend. No passwords are stored here.'),'tag'));return;}
+   if(session.provider==='chatgpt'){
+    content.append(make('p',session.user?tr('تم الدخول عبر حساب ChatGPT','Signed in with ChatGPT'):tr('استخدم الدخول الآمن عبر ChatGPT','Secure ChatGPT sign-in')));
+    const a=make('a',session.user?tr('تسجيل الخروج','Sign out'):tr('تسجيل الدخول','Sign in'));a.href=session.user?'/signout-with-chatgpt?return_to=%2F':'/signin-with-chatgpt?return_to=%2F';a.target='_top';content.append(a);
+    if(session.user)syncPanel(content);return;
+   }
    if(session.local)content.append(make('p',tr('حساب محلي على هذا الجهاز فقط؛ لا مزامنة سحابية.','Local account on this device only; no cloud sync.'),'muted'));
    const output=make('p',null,'settings-message');output.setAttribute('role','status');
    if(session.user){
@@ -35,7 +51,7 @@ export function createSettings({state,apply}){
     const logout=make('button',tr('تسجيل الخروج','Sign out'));logout.onclick=async()=>{logout.disabled=true;try{await request('logout',{});session.user=null;render();}catch(e){output.textContent=message(e);logout.disabled=false;}};content.append(logout);
     const change=make('form',null,'settings-form'),old=make('input'),next=make('input');old.type=next.type='password';old.autocomplete='current-password';next.autocomplete='new-password';old.required=next.required=true;next.minLength=12;old.maxLength=512;next.maxLength=512;
     for(const [input,label] of [[old,tr('كلمة المرور الحالية','Current password')],[next,tr('كلمة المرور الجديدة','New password')]]){const l=make('label',label,'setting-field');l.append(input);change.append(l);}
-    const submit=make('button',tr('تغيير كلمة المرور','Change password'));submit.type='submit';change.append(submit);change.onsubmit=async e=>{e.preventDefault();submit.disabled=true;try{await request('password',{password:old.value,newPassword:next.value});old.value=next.value='';output.textContent=tr('تم تغيير كلمة المرور وإلغاء الجلسات السابقة.','Password updated; previous sessions revoked.');}catch(e){output.textContent=message(e);}finally{submit.disabled=false;}};content.append(change,output);return;
+    const submit=make('button',tr('تغيير كلمة المرور','Change password'));submit.type='submit';change.append(submit);change.onsubmit=async e=>{e.preventDefault();submit.disabled=true;try{await request('password',{password:old.value,newPassword:next.value});old.value=next.value='';output.textContent=tr('تم تغيير كلمة المرور وإلغاء الجلسات السابقة.','Password updated; previous sessions revoked.');}catch(e){output.textContent=message(e);}finally{submit.disabled=false;}};content.append(change,output);syncPanel(content);return;
    }
    const switchMode=make('button',mode==='login'?tr('إنشاء حساب جديد','Create account'):tr('لدي حساب','I have an account'));switchMode.onclick=()=>{mode=mode==='login'?'register':'login';render();};content.append(switchMode);
    const form=make('form',null,'settings-form'),user=make('input'),pw=make('input');user.name='username';user.autocomplete='username';user.required=true;user.minLength=3;user.maxLength=32;user.pattern='[a-zA-Z0-9][a-zA-Z0-9_.-]{2,31}';user.dir='ltr';pw.name='password';pw.type='password';pw.required=true;pw.maxLength=512;pw.autocomplete=mode==='register'?'new-password':'current-password';if(mode==='register')pw.minLength=12;
@@ -51,6 +67,10 @@ export function createSettings({state,apply}){
   const section=make('section',null,'settings-section');section.append(make('h3',tr('اللغة والمظهر','Language & appearance')));
   choice(section,tr('لغة التطبيق','Application language'),'lang',[['ar','العربية'],['en','English']]);choice(section,tr('المظهر','Theme'),'theme',[['dark',tr('داكن','Dark')],['light',tr('فاتح','Light')]]);choice(section,tr('حجم الخط','Text size'),'font',[['standard',tr('قياسي','Standard')],['large',tr('كبير','Large')]]);choice(section,tr('الحركة','Motion'),'motion',[['system',tr('إعداد النظام','System')],['reduced',tr('حركة أقل','Reduced')]]);
   const l=make('label',null,'setting-toggle'),c=make('input');c.type='checkbox';c.checked=state.preferences.auto;c.onchange=()=>{state.preferences.auto=c.checked;apply();};l.append(c,document.createTextNode(tr('تحديث المصادر دوريًا حسب وتيرة كل مصدر','Refresh feeds periodically at source cadence')));section.append(l);const low=make('label',null,'setting-toggle'),lc=make('input');lc.type='checkbox';lc.checked=state.preferences.lowData;lc.onchange=()=>{state.preferences.lowData=lc.checked;apply();};low.append(lc,document.createTextNode(tr('وضع الاتصال الضعيف — تعطيل التحديث التلقائي','Low-data mode — pause automatic refresh')));section.append(low);dialog.append(section);account(dialog);
+  const push=make('section',null,'settings-section');push.append(make('h3',tr('إشعارات البحث','Research notifications')));
+  const pi=make('p',tr('إشعارات اختبارية اختيارية فقط — ليست تحذيرات طوارئ.','Optional research test notifications only — not emergency warnings.'),'muted');push.append(pi);
+  const toggle=make('button',tr('الإشعارات غير مهيأة','Notifications not configured'));toggle.disabled=true;push.append(toggle);dialog.append(push);
+  if(pushAvailable()){pushStatus().then(enabled=>{const drawPush=()=>{toggle.textContent=enabled?tr('إيقاف الإشعارات','Disable notifications'):tr('تفعيل الإشعارات','Enable notifications');toggle.disabled=false;};drawPush();toggle.onclick=async()=>{toggle.disabled=true;try{await setPush(!enabled);enabled=!enabled;pi.textContent=tr('تم تحديث الاشتراك','Subscription updated');}catch(e){pi.textContent=tr('تعذر تحديث الاشتراك','Subscription update failed');}finally{drawPush();}};}).catch(()=>{});}
   dialog.append(make('p',tr('الساعة تتحرك كل ثانية؛ لا تتغير القياسات إلا عند صدورها من المصدر.','Clock updates every second; measurements change only when published by sources.'),'muted'));
  }
  return {open(){draw();if(!dialog.open)dialog.showModal();}};

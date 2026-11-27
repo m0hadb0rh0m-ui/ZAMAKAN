@@ -1,4 +1,4 @@
-# زَمَكان | ZAMAKAN 2.0.0 RC
+# زَمَكان | ZAMAKAN 2.1.0 RC
 Global Earth, Weather, Disaster & Space Intelligence
 
 **Research MVP — not a certified early warning or emergency system.**
@@ -79,3 +79,7 @@ See [scientific reliability and staging guide](docs/release-0.5.md). Public sour
 ## 2.0 — Mobile-first research release candidate
 
 See [report implementation and release gates](docs/release-2.0.md) for scope, verified design decisions and remaining production dependencies.
+
+## 2.1 — Production pilot
+
+See [release and cloud operations](docs/release-2.1.md) for the hosted worker, account sync, CAP registry, 3D scene, optional FCM and verified-signature build workflow.

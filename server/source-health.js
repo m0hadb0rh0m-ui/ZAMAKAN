@@ -27,7 +27,7 @@ async function readBounded(response,limit=2000000){
  const reader=response.body.getReader(),chunks=[];let total=0;
  try{while(true){const {done,value}=await reader.read();if(done)break;total+=value.byteLength;if(total>limit)throw Error('payload too large');chunks.push(value);}}
  finally{await reader.cancel().catch(()=>{});}
- return Buffer.concat(chunks,total).toString('utf8');
+ const bytes=new Uint8Array(total);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}return new TextDecoder().decode(bytes);
 }
 export function createSourceMonitor({fetcher=fetch,now=Date.now,mode='live',ttl=60000}={}){
  let snapshot=null,pending=null;

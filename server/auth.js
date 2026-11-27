@@ -1,3 +1,4 @@
+import {validateUserState,validateRevision} from '../shared/user-state.js';
 import {DatabaseSync} from 'node:sqlite';
 import {randomBytes,scrypt,timingSafeEqual,createHash} from 'node:crypto';
 import {promisify} from 'node:util';
@@ -15,7 +16,8 @@ export function createAuth({dbPath,host,publicOrigin='',now=Date.now}){
  if(db){db.exec(`PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
  CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,username TEXT NOT NULL UNIQUE,salt TEXT NOT NULL,hash TEXT NOT NULL,created INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,expires INTEGER NOT NULL);
- CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires);`);}
+ CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires);
+ CREATE TABLE IF NOT EXISTS user_state(user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,revision INTEGER NOT NULL,updated INTEGER NOT NULL,payload TEXT NOT NULL);`);}
  const limits=new Map();let activeHashes=0;
  const rate=(key,max)=>{
   const t=now();if(limits.size>=4000){for(const [k,v] of limits)if(v.until<=t)limits.delete(k);if(limits.size>=4000&&!limits.has(key))return false;}
@@ -26,9 +28,9 @@ export function createAuth({dbPath,host,publicOrigin='',now=Date.now}){
  const expectedOrigin=req=>local&&/^127\.0\.0\.1:\d+$/.test(req.headers.host||'')?'http://'+req.headers.host:!local?configuredOrigin:'';
  const token=req=>{const x=(req.headers.cookie||'').split(';').map(s=>s.trim()).find(s=>s.startsWith(cookieName+'='))?.slice(cookieName.length+1);return /^[a-f0-9]{64}$/.test(x||'')?digest(x):null;};
  const session=req=>{const t=token(req);if(!t)return null;return db.prepare('SELECT u.id,u.username FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires>?').get(t,now())||null;};
- async function credentials(req){
-  if(Number(req.headers['content-length'])>4096)throw Error('oversize');let bytes=0,chunks=[];
-  for await(const c of req){bytes+=c.length;if(bytes>4096)throw Error('oversize');chunks.push(c);}return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+ async function credentials(req,max=4096){
+  if(Number(req.headers['content-length'])>max)throw Error('oversize');let bytes=0,chunks=[];
+  for await(const c of req){bytes+=c.length;if(bytes>max)throw Error('oversize');chunks.push(c);}return JSON.parse(Buffer.concat(chunks).toString('utf8'));
  }
  async function handle(req,res,path){
   if(!path.startsWith('/api/auth/'))return false;
@@ -39,6 +41,19 @@ export function createAuth({dbPath,host,publicOrigin='',now=Date.now}){
    const u=session(req);return json(200,{enabled:true,user:u?{username:u.username}:null,local});
   }
   if(!enabled||!origin)return json(503,{error:'auth-disabled'});
+  if(path==='/api/auth/sync'){
+   const u=session(req);if(!u)return json(401,{error:'invalid-credentials'});
+   const get=()=>db.prepare('SELECT revision,updated,payload FROM user_state WHERE user_id=?').get(u.id);
+   if(req.method==='GET'){const r=get();return json(200,r?{revision:r.revision,updated:r.updated,state:JSON.parse(r.payload)}:{revision:0,updated:null,state:null});}
+   if(req.method!=='POST')return json(405,{error:'method-not-allowed'});
+   if(req.headers.origin!==origin||!/^application\/json(?:;|$)/i.test(req.headers['content-type']||''))return json(403,{error:'same-origin-required'});
+   if(!rate('sync:'+u.id,60))return json(429,{error:'rate-limit'});
+   try{const input=await credentials(req,16384),rev=validateRevision(input.revision),payload=JSON.stringify(validateUserState(input.state)),t=now();let result;
+    if(rev===0)result=db.prepare('INSERT OR IGNORE INTO user_state(user_id,revision,updated,payload) VALUES(?,1,?,?)').run(u.id,t,payload);
+    else result=db.prepare('UPDATE user_state SET revision=revision+1,updated=?,payload=? WHERE user_id=? AND revision=?').run(t,payload,u.id,rev);
+    if(!result.changes)return json(409,{error:'sync-conflict'});return json(200,{revision:rev+1,updated:t});
+   }catch{return json(400,{error:'invalid-state'});}
+  }
   if(req.method!=='POST')return json(405,{error:'method-not-allowed'},{Allow:'POST'});
   if(req.headers.origin!==origin||!/^application\/json(?:;|$)/i.test(req.headers['content-type']||''))return json(403,{error:'same-origin-required'});
   const ip=req.socket.remoteAddress||'unknown';
