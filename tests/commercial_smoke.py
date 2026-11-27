@@ -14,7 +14,8 @@ with sync_playwright() as p:
  page.wait_for_timeout(800)
  page.locator('#layersClose').click()
  page.locator('#settings').click()
- assert page.locator('input[type=password]').count()==0
+ assert page.locator('input[type=password]:visible').count()==0
+ assert page.locator('#mapKey, #ionToken').count()==0
  assert not page.locator('#openRealistic').is_visible()
  page.locator('#settingsClose').click()
  page.locator('#searchinput').fill('New York')

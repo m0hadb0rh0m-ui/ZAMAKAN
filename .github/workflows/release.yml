@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
-    if: inputs.owner_approved == true && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/zamakan-ultra-map-ui')
+    if: inputs.owner_approved == true && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/zamakan-ultra-map-ui' || github.ref == 'refs/heads/feature/zamakan-experience')
     runs-on: ubuntu-latest
     environment: production
     env:
@@ -30,6 +30,8 @@ jobs:
       VITE_MAPTILER_PUBLIC_KEY: ${{ secrets.MAPTILER_PUBLIC_KEY }}
       VITE_CESIUM_PUBLIC_TOKEN: ${{ secrets.CESIUM_PUBLIC_TOKEN }}
       VITE_WEATHER_API_BASE: ${{ vars.WEATHER_API_BASE }}
+      VITE_ZAMAKAN_API_BASE: ${{ vars.ZAMAKAN_API_BASE }}
+      VITE_LIVE_BUILDINGS_BASE: ${{ vars.LIVE_BUILDINGS_BASE }}
       ZAMAKAN_VERSION_CODE: ${{ inputs.version_code }}
       ZAMAKAN_VERSION_NAME: ${{ inputs.version_name }}
     steps:

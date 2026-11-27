@@ -15,4 +15,10 @@ try{
  const r=await fetch(endpoint,{signal:AbortSignal.timeout(18000),redirect:'error',headers:{Origin:'https://localhost'}});if(!r.ok||!(await r.json())?.current)fail('Weather gateway');
  if(r.headers.get('access-control-allow-origin')!=='https://localhost')fail('Weather Android CORS');
 }catch{fail('Weather gateway');}
+const service=approvedWeatherBase(process.env.VITE_ZAMAKAN_API_BASE||'');
+if(!service)throw Error('Missing PRIME backend URL');
+try{
+ const r=await fetch(service+'/api/prime/config',{headers:{Origin:'https://localhost'},signal:AbortSignal.timeout(15000)});
+ if(!r.ok||!(await r.json()).enabled||r.headers.get('access-control-allow-origin')!=='https://localhost')throw Error('Backend unavailable');
+}catch{fail('PRIME backend');}
 console.log('Provider access preflight succeeded. Commercial rights require owner confirmation.');

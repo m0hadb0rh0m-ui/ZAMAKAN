@@ -11,3 +11,7 @@ android-benchmark-results/
 *.jks
 *.p12
 release-checksums.sha256
+
+/data/
+__pycache__/
+credentials*.json

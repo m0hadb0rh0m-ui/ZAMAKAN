@@ -3,3 +3,10 @@ dist
 .git
 .env
 android
+.env.*
+!.env.example
+data
+*.p12
+*.jks
+*.keystore
+credentials*.json

@@ -16,3 +16,5 @@ export function weatherEndpoint(kind,{commercial=COMMERCIAL,base=WEATHER_BASE}={
  if(!approved)throw Error('Licensed weather gateway not configured');
  return approved+'/'+kind;
 }
+
+export const LIVE_BUILDINGS_BASE=approvedWeatherBase(env.VITE_LIVE_BUILDINGS_BASE||'');

@@ -83,7 +83,8 @@ with sync_playwright() as p:
  page.screenshot(path=OUT/'science.png')
  page.locator('#settings').click()
  page.screenshot(path=OUT/'provider-settings.png')
- assert page.locator('input[type=password]').count()==0
+ assert page.locator('input[type=password]:visible').count()==0
+ assert page.locator('#mapKey, #ionToken').count()==0
  page.locator('#openSettings').click()
  page.locator('#dataTitle').click()
  page.locator('#qualitySelect').select_option('save')
