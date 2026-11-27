@@ -4,3 +4,16 @@ dist/
 android/
 *.keystore
 *.log
+
+/desktop/node_modules/
+/desktop/release/
+/desktop/dist/
+/desktop/server/
+
+/desktop/shared/
+__pycache__/
+
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+/state/

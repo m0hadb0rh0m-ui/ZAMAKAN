@@ -3,3 +3,10 @@ dist
 .git
 .env
 android
+
+desktop/node_modules
+desktop/release
+desktop/dist
+desktop/server
+
+desktop/shared

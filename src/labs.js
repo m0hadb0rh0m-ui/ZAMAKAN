@@ -1,0 +1,135 @@
+import {spectrum,parseTLE,orbitAt,groundTrack,radarFrames,buildings,parseCAP} from './science.js';
+import {fetchSource,iso} from './data.js';
+import {gridSpec,windRequest,decodeWindGrid,renderWind,WIND_MODELS} from './wind.js';
+import {compareModels,comparisonCSV,MODEL_IDS,MODEL_FIELDS} from './models.js';
+import {parseSamples} from './signal.js';
+import {alertLifecycle,nwsAlerts,capPolygon} from './alerts.js';
+import {aiSnapshot} from '../shared/ai-context.js';
+import {CIVIL_SATELLITES,fetchCivilOrbit} from './space-feeds.js';
+const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text)n.textContent=text;if(cls)n.className=cls;return n;};
+const empty={type:'FeatureCollection',features:[]};
+export function createLabs({state,getMap,selectPosition,renderChrome}){
+ let lastTab,lastLang,view,radar=[],frame=0,playing=false,timer,record,windFrame,windStop,orbitShown=false,liveOrbit=false,orbitReadout,orbitTrackAt=0,orbitPath=null,radarOn=false,buildingOn=false;
+ const tr=(a,b)=>state.lang==='ar'?a:b;
+ const currentMap=()=>{const m=getMap();if(!m)throw Error(tr('الخريطة غير جاهزة','Map is not ready'));return m;};
+ function source(name,data){const m=currentMap();if(m.getSource(name))m.getSource(name).setData(data);else m.addSource(name,{type:'geojson',data});return m;}
+ function remove(id){const m=getMap();if(!m)return;if(m.getLayer(id))m.removeLayer(id);if(m.getSource(id))m.removeSource(id);}
+ function orbitRender(time=state.at){
+  if(!record)return;const data=groundTrack(record,time),m=source('orbits',data);orbitPath=data.features.filter(f=>f.geometry.type==='LineString');orbitTrackAt=time;
+  if(!m.getLayer('orbit-line'))m.addLayer({id:'orbit-line',type:'line',source:'orbits',filter:['==',['geometry-type'],'LineString'],paint:{'line-color':'#77eaf9','line-width':2.5,'line-dasharray':[3,2]}});
+  if(!m.getLayer('orbit-point'))m.addLayer({id:'orbit-point',type:'circle',source:'orbits',filter:['==',['geometry-type'],'Point'],paint:{'circle-color':'#fcce72','circle-radius':7,'circle-stroke-width':2,'circle-stroke-color':'#fff'}});
+  orbitShown=true;return orbitAt(record,time);
+ }
+ function clearOrbit(){let m=getMap();if(m?.getLayer('orbit-point'))m.removeLayer('orbit-point');if(m?.getLayer('orbit-line'))m.removeLayer('orbit-line');if(m?.getSource('orbits'))m.removeSource('orbits');orbitShown=false;liveOrbit=false;orbitPath=null;}
+ const card=(a,b,hint)=>{const s=el('section',null,'card lab');s.append(el('small','ZAMAKAN / SCIENCE LAB','eyebrow'),el('h2',tr(a,b)),el('p',hint,'muted'));view.append(s);return s;};
+ function button(parent,a,b,action){const btn=el('button',tr(a,b),'lab-button');btn.type='button';btn.onclick=async()=>{btn.disabled=true;try{await action();}catch(e){out.textContent=String(e.message||e);}finally{btn.disabled=false;}};parent.append(btn);const out=parent.querySelector('.lab-output')||el('div',null,'lab-output');if(!out.parentNode)parent.append(out);return out;}
+ function field(parent,a,b,type='text'){const label=el('label',tr(a,b),'lab-label');const input=el(type==='textarea'?'textarea':'input');if(type!=='textarea')input.type=type;label.append(input);parent.append(label);return input;}
+ function select(parent,a,b,options){const label=el('label',tr(a,b),'lab-label'),s=el('select',null,'lab-select');for(const [value,name] of options){const o=el('option',name);o.value=value;s.append(o);}label.append(s);parent.append(label);return s;}
+ function download(text,name){const url=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'})),a=el('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);}
+ function clearWind(){windStop?.();windStop=undefined;}
+ function line(parent,label,value){const row=el('div',null,'lab-row');row.append(el('span',label),el('strong',String(value)));parent.append(row);}
+ function fileField(parent,a,b,accept,limit,handler){const f=field(parent,a,b,'file');f.accept=accept;const out=el('div',null,'lab-output');parent.append(out);f.onchange=async()=>{try{const file=f.files[0];if(!file)return;if(file.size>limit)throw Error('File too large');await handler(await file.text(),out);}catch(e){out.textContent=e.message;}};return out;}
+ function radarDraw(){const m=currentMap(),r=radar[frame];if(!r)return;remove('radar');m.addSource('radar',{type:'raster',tiles:[r.tile],tileSize:256,maxzoom:7,attribution:'RainViewer · radar archive'});m.addLayer({id:'radar',type:'raster',source:'radar',paint:{'raster-opacity':0.65}},'quakes');radarOn=true;}
+ function radarLab(){
+  const c=card('رادار الهطول','Precipitation radar',tr('أرشيف RainViewer، آخر ساعتين عند توافر التغطية. غياب الصدى لا يعني غياب المطر.','RainViewer archive, about two hours where coverage exists. No echo does not establish absence of rain.'));
+  const stamp=el('p',null,'lab-output');c.append(stamp);const slider=field(c,'الإطار الزمني','Radar frame','range');slider.min=0;slider.max=Math.max(0,radar.length-1);slider.value=frame;
+  function update(){radarDraw();slider.value=frame;stamp.textContent=new Date(radar[frame].time).toISOString()+' · RainViewer';}
+  button(c,'تحميل الرادار','Load radar',async()=>{const d=await fetch('https://api.rainviewer.com/public/weather-maps.json',{signal:AbortSignal.timeout(15000),credentials:'omit'});if(!d.ok)throw Error('Radar HTTP '+d.status);radar=radarFrames(await d.json());if(!radar.length)throw Error('No radar frames');frame=radar.length-1;slider.max=frame;update();});
+  slider.oninput=()=>{if(radar.length){frame=Number(slider.value);try{update();}catch(e){stamp.textContent=e.message;}}};
+  button(c,'تشغيل / إيقاف','Play / pause',()=>{if(!radar.length)throw Error('Load radar first');playing=!playing;clearInterval(timer);if(playing)timer=setInterval(()=>{frame=(frame+1)%radar.length;try{update();}catch(e){clearInterval(timer);playing=false;stamp.textContent=e.message;}},1300);});
+  button(c,'إخفاء الطبقة','Hide layer',()=>{playing=false;clearInterval(timer);remove('radar');radarOn=false;stamp.textContent='—';});
+  if(radarOn&&radar.length)stamp.textContent=new Date(radar[frame].time).toISOString()+' · RainViewer';
+  const w=card('حقل الرياح الديناميكي','Regional wind field',tr('شبكة ٢٥ نقطة من نموذج حقيقي عند ساعة UTC محددة؛ استيفاء ثنائي خطي للمتجهات. حركة مُسرّعة بصريًا وليست قياسًا مباشرًا.','25 model grid samples at a common UTC hour, bilinear vector interpolation. Visually accelerated; not live observations.'));
+  const model=select(w,'النموذج','Model',WIND_MODELS.map(x=>[x,MODEL_IDS.find(m=>m[0]===x)?.[1]||x]));
+  const span=select(w,'امتداد المنطقة','Region extent',[['4','4° × 4°'],['8','8° × 8°'],['12','12° × 12°']]);
+  const info=button(w,'تحميل الحقل وتحريكه','Load and animate field',async()=>{
+    clearWind();const pos={...state.position},at=state.at,grid=gridSpec(pos.lon,pos.lat,Number(span.value)),m=currentMap();
+    info.textContent=tr('جارٍ تنزيل الشبكة…','Loading model grid…');
+    const r=await fetch(windRequest(grid,model.value,at),{signal:AbortSignal.timeout(20000),credentials:'omit',referrerPolicy:'no-referrer'});
+    if(!r.ok)throw Error('Wind HTTP '+r.status);
+    const g=decodeWindGrid(await r.json(),grid,at,model.value);if(!w.isConnected)return;
+    state.mode='flat';m.setProjection({type:'mercator'});m.fitBounds([[g.west,g.south],[g.west+g.span,g.south+g.span]],{padding:45,pitch:0,bearing:0,duration:600});renderChrome();windStop=renderWind(m,g);
+    info.textContent='';line(info,'Model / UTC',g.model+' · '+g.hour);line(info,'Grid',g.n+' × '+g.n+' · '+g.span+'°');line(info,'Source','Open-Meteo · model winds at 10 m');
+    const key=el('div',null,'lab-legend');for(const [color,label] of [['#8bf8db','0–8 m/s'],['#7ae3ff','8–15 m/s'],['#ffd18c','>15 m/s']]){const item=el('span'),i=el('i');i.style.background=color;item.append(i,document.createTextNode(label));key.append(item);}info.append(key);
+  });
+  button(w,'إيقاف حقل الرياح','Stop wind field',()=>{clearWind();info.textContent='—';});
+
+ }
+ function orbitLab(){
+  const c=card('المدارات SGP4','SGP4 ground tracks',tr('ألصق TLE حديثًا لقمر علمي أو مدني؛ حساب موضع تقديري لا رصد حي. الحد ±٧ أيام من حقبة العناصر.','Paste a recent scientific/civil satellite TLE. Estimated position, not live telemetry. Limited to ±7 days from epoch.'));
+  const tle=field(c,'عنصران مداريان TLE','Two-line elements','textarea');tle.rows=5;tle.dir='ltr';if(record)tle.value=record.raw;
+  const t=field(c,'الوقت UTC','UTC time','datetime-local');t.value=new Date(state.at).toISOString().slice(0,16);
+  const out=button(c,'احسب واعرض المدار','Compute and plot',()=>{const r=parseTLE(tle.value);r.raw=tle.value;const when=Date.parse(t.value+'Z');const p=orbitAt(r,when);clearOrbit();record=r;orbitRender(when);out.textContent='';line(out,r.name,new Date(when).toISOString());line(out,'Epoch',new Date(r.epoch).toISOString());line(out,'Latitude',p.lat.toFixed(4)+'°');line(out,'Longitude',p.lon.toFixed(4)+'°');line(out,'Altitude',p.height.toFixed(1)+' km');});
+  button(c,'إخفاء المدار','Clear orbit',()=>{clearOrbit();record=null;out.textContent='—';});
+  const link=el('a','CelesTrak · TLE');link.href='https://celestrak.org/NORAD/elements/';link.target='_blank';link.rel='noopener noreferrer';c.append(link);
+  const live=card('مرصد الأقمار المدنية','Civil satellite observatory',tr('عناصر GP من CelesTrak؛ حساب SGP4 موضعًا تقديريًا كل ثانية، لا بثًا لحظيًا من القمر. تُحترم وتيرة تحديث بيانات المصدر.','CelesTrak GP elements; SGP4 estimated position every second, not satellite telemetry. Source cadence is respected.'));
+  const satellite=select(live,tr('القمر المدني','Civil satellite'),tr('القمر المدني','Civil satellite'),CIVIL_SATELLITES);
+  const outLive=button(live,'بدء التتبع','Start tracking',async()=>{outLive.textContent=tr('جارٍ جلب العناصر المدارية…','Fetching orbital elements…');const d=await fetchCivilOrbit(satellite.value);if(!live.isConnected)return;clearOrbit();record=d.record;const p=orbitRender(Date.now());liveOrbit=true;orbitReadout=outLive;outLive.textContent='';line(outLive,'Source','CelesTrak · '+record.name);line(outLive,'Epoch',new Date(record.epoch).toISOString());const v=el('div',null,'orbit-live-values');outLive.append(v);v.textContent=p.lat.toFixed(4)+'° / '+p.lon.toFixed(4)+'° · '+p.height.toFixed(1)+' km';});
+  button(live,'إيقاف التتبع','Stop tracking',()=>{clearOrbit();outLive.textContent='—';});
+
+ }
+ function modelsLab(){
+  const c=card('مقارنة النماذج العددية','Numerical model comparison',tr('سلاسل متزامنة من IFS وGFS وICON لنقطة واحدة، مع إظهار القيم المفقودة ومدى الاختلاف بين النماذج. ليس مجال ثقة إحصائيًا.','Aligned IFS/GFS/ICON hourly forecasts with missing-data gaps and model spread, not a calibrated confidence interval.'));
+  const range=select(c,'الأفق الزمني','Horizon',[['24','24 h'],['48','48 h']]),variable=select(c,'المتغير','Variable',MODEL_FIELDS.map(([k,u])=>[k,k+' · '+u]));
+  let data=null;
+  const colors=['#6ce4d4','#f3bd70','#a79cff'];
+  const plot=()=>{
+   if(!data)return;out.textContent='';line(out,'UTC',data.time[0]+' → '+data.time.at(-1));line(out,'Lat / Lon',data.pos.lat.toFixed(3)+' / '+data.pos.lon.toFixed(3));
+   const key=variable.value,unit=MODEL_FIELDS.find(([k])=>k===key)[1],values=data.series.flatMap(s=>s.fields[key]).filter(Number.isFinite);
+   if(values.length){
+    const min=Math.min(...values),max=Math.max(...values),canvas=el('canvas');canvas.width=360;canvas.height=190;canvas.className='wind-canvas';out.append(canvas);
+    const g=canvas.getContext('2d');g.fillStyle='#0a1929';g.fillRect(0,0,360,190);g.strokeStyle='#31495e';g.font='11px system-ui';g.fillStyle='#b8cbd8';for(let i=0;i<=4;i++){let y=16+i*38;g.beginPath();g.moveTo(40,y);g.lineTo(350,y);g.stroke();g.fillText((max-(max-min)*i/4).toFixed(1),3,y+3);}
+    data.series.forEach((s,j)=>{g.strokeStyle=colors[j];g.lineWidth=2;g.beginPath();let active=false;s.fields[key].forEach((v,i)=>{if(!Number.isFinite(v)){active=false;return;}const x=40+i*310/Math.max(1,data.time.length-1),y=168-(v-min)/Math.max(.01,max-min)*152;active?g.lineTo(x,y):g.moveTo(x,y);active=true;});g.stroke();});
+    const legend=el('div',null,'lab-legend');data.series.forEach((s,j)=>{const t=el('span'),i=el('i');i.style.background=colors[j];t.append(i,document.createTextNode(s.name));legend.append(t);});out.append(legend);
+   }
+   let table=el('table',null,'lab-table'),head=el('tr');['Model',unit,'State'].forEach(x=>head.append(el('th',x)));table.append(head);
+   for(const s of data.series){const r=el('tr'),v=s.fields[key][0];[s.name,Number.isFinite(v)?v.toFixed(2):'—',s.state].forEach(x=>r.append(el('td',x)));table.append(r);}out.append(table);
+   const spreads=data.spread[key].filter(Number.isFinite);line(out,'Max model spread',spreads.length?Math.max(...spreads).toFixed(2)+' '+unit:'—');
+  };
+  const out=button(c,'مقارنة IFS / GFS / ICON','Compare IFS / GFS / ICON',async()=>{
+   const pos={...state.position},at=state.at,hours=Number(range.value);out.textContent=tr('جارٍ التحميل…','Loading…');
+   const rows=await Promise.all(MODEL_IDS.map(async ([id,name])=>{const p=new URLSearchParams({latitude:pos.lat.toFixed(3),longitude:pos.lon.toFixed(3),timezone:'GMT',current:'temperature_2m',hourly:MODEL_FIELDS.map(([k])=>k).join(','),models:id,forecast_days:'4',past_days:'1',wind_speed_unit:'kmh',temperature_unit:'celsius',precipitation_unit:'mm'});return {id,name,result:await fetchSource('weather',p.toString())};}));
+   data={...compareModels(rows,at,hours),pos};plot();
+  });
+  variable.onchange=plot;
+  button(c,'تصدير المقارنة CSV','Export comparison CSV',()=>{if(!data)throw Error('Compare models first');download(comparisonCSV(data),'zamakan-model-comparison.csv');});
+ }
+ function fftLab(){
+  const c=card('مختبر الإشارات FFT Pro','FFT Pro signal laboratory',tr('عامل معالجة مستقل، نوافذ طيفية، PSD، إزاحة DC واستخراج التردد. ارفع CSV عمودًا واحدًا أو ألصق عينات منتظمة.','Independent Web Worker, spectral windows, PSD, DC removal and peak detection. Upload one-column CSV or paste evenly spaced samples.'));
+  const input=field(c,'العينات','Samples','textarea');input.rows=5;input.dir='ltr';const rate=field(c,'معدل أخذ العينات Hz','Sample rate Hz','number');rate.min='0.001';rate.value='1';rate.step='any';
+  const file=field(c,'ملف CSV / TXT','CSV / TXT file','file');file.accept='.csv,.txt';file.onchange=async()=>{const f=file.files[0];if(f&&f.size<=2000000)input.value=await f.text();};
+  const window=select(c,'النافذة','Window',[['rectangular','Rectangular'],['hann','Hann'],['hamming','Hamming'],['blackman','Blackman']]),scale=select(c,'مقياس الطيف','Spectrum scale',[['amplitude','Amplitude'],['powerDensity','PSD (unit²/Hz)'],['relativeDb','Relative dB']]);
+  const dc=field(c,'إزالة المتوسط DC','Remove DC mean','checkbox');let result=null;
+  function plot(){if(!result)return;const r=result;out.textContent='';line(out,'Samples / FFT',r.n+' / '+r.fftN);line(out,'Peak (excluding DC)',r.peak.frequency.toPrecision(5)+' Hz');line(out,'Amplitude',r.peak.amplitude.toPrecision(5));line(out,'Bin / resolution',r.binHz.toPrecision(4)+' / '+r.resolutionHz.toPrecision(4)+' Hz');line(out,'Nyquist',r.nyquist+' Hz');line(out,'RMS',r.rms.toPrecision(5));
+   const canvas=el('canvas');canvas.width=360;canvas.height=190;canvas.className='wind-canvas';out.append(canvas);const g=canvas.getContext('2d'),key=scale.value,min=key==='relativeDb'?-160:0,max=key==='relativeDb'?0:r.bins.reduce((a,b)=>Math.max(a,b[key]),1e-20),step=Math.max(1,Math.ceil(r.bins.length/320));g.fillStyle='#0a1929';g.fillRect(0,0,360,190);g.fillStyle='#6ce4d4';for(let j=0;j<r.bins.length;j+=step){let peak=min;for(let k=j;k<Math.min(j+step,r.bins.length);k++)peak=Math.max(peak,r.bins[k][key]);let h=(peak-min)/(max-min)*150;g.fillRect(12+j/r.bins.length*336,166-h,Math.max(1,step/r.bins.length*336-1),h);}g.fillStyle='#b8cbd8';g.font='11px system-ui';g.fillText('0 Hz',8,183);g.fillText(r.nyquist+' Hz',290,183);}
+  const out=button(c,'حساب الطيف','Calculate spectrum',async()=>{const samples=parseSamples(input.value);out.textContent=tr('جارٍ التحليل…','Analyzing…');result=await new Promise((resolve,reject)=>{const worker=new Worker(new URL('./signal.worker.js',import.meta.url),{type:'module'});const timeout=setTimeout(()=>{worker.terminate();reject(Error('FFT timeout'));},15000);worker.onmessage=e=>{clearTimeout(timeout);worker.terminate();e.data.ok?resolve(e.data.result):reject(Error(e.data.error));};worker.onerror=()=>{clearTimeout(timeout);worker.terminate();reject(Error('FFT worker failed'));};worker.postMessage({samples,rate:Number(rate.value),options:{window:window.value,detrend:dc.checked}});});plot();});
+  scale.onchange=plot;
+  button(c,'مثال اصطناعي واضح','Synthetic example',()=>{rate.value='64';input.value=Array.from({length:64},(_,i)=>Math.sin(2*Math.PI*8*i/64).toFixed(6)).join(', ');out.textContent=tr('مثال اصطناعي: موجة ٨ Hz. اضغط حساب الطيف.','Synthetic 8 Hz sine. Press Calculate spectrum.');});
+  button(c,'تصدير طيف CSV','Export spectrum CSV',()=>{if(!result)throw Error('Compute spectrum first');download(['frequency_hz,amplitude,psd,relative_db',...result.bins.map(b=>[b.frequency,b.amplitude,b.powerDensity,b.relativeDb].join(','))].join('\n'),'zamakan-spectrum.csv');});
+ }
+ function capLab(){
+  const c=card('مركز رسائل CAP 1.2','CAP 1.2 message center',tr('قراءة رسائل CAP وتقييم الحالة الزمنية وعرض المضلعات. الملفات المستوردة غير موثقة؛ لا يستخدم التطبيق كمنظومة إنذار معتمدة.','Inspect CAP messages, lifecycle and polygon geometry. Imported messages are unverified; not a certified warning system.'));
+  function alertMap(features){const m=source('cap-areas',{type:'FeatureCollection',features});if(!m.getLayer('cap-fill'))m.addLayer({id:'cap-fill',type:'fill',source:'cap-areas',paint:{'fill-color':['case',['==',['get','verified'],true],'#f9ba72','#91a2b6'],'fill-opacity':0.19,'fill-outline-color':['case',['==',['get','verified'],true],'#ffcc92','#9aaec6']}});}
+  fileField(c,'استيراد CAP XML','Import CAP XML','.xml,.cap,application/xml',500000,(raw,out)=>{const a=parseCAP(raw);out.textContent='';for(const k of ['identifier','sender','sent','status','type','scope','references'])if(a[k])line(out,k,a[k]);line(out,'Lifecycle',alertLifecycle(a));for(const i of a.info){const b=el('div',null,'cap-item');for(const [k,v] of Object.entries(i))if(v&&k!=='areas')line(b,k,v);out.append(b);}out.prepend(el('p',tr('غير موثّقة — افحص المصدر والحالة والصلاحية.','Unverified — check sender, status and expiration.'),'tag'));const features=a.info.flatMap(i=>i.areas.flatMap(a=>a.polygons.map(capPolygon).filter(Boolean).map(geometry=>({type:'Feature',properties:{},geometry}))));if(getMap())alertMap(features);});
+  const feed=card('التغذية الرسمية الأمريكية','Official US NWS feed',tr('NWS فقط، تغطية الولايات المتحدة ومناطق اختصاصه، وليس إنذارات عالمية أو تغطية غزة. اعتمد دائمًا على الجهة الرسمية.','NWS only: United States and its jurisdictions, not global or Gaza coverage. Always consult the official authority.'));
+  const out=button(feed,'تحميل أحدث رسائل NWS','Load NWS alerts',async()=>{out.textContent=tr('جارٍ التحقق من المصدر…','Fetching source…');const r=await fetch('https://api.weather.gov/alerts/active',{headers:{Accept:'application/geo+json'},signal:AbortSignal.timeout(15000),credentials:'omit'});if(!r.ok)throw Error('NWS HTTP '+r.status);const data=nwsAlerts(await r.json());out.textContent='';line(out,'NWS · retrieved UTC',new Date().toISOString());line(out,'Valid active feed entries',data.length);if(getMap())alertMap(data.filter(a=>a.geometry).map(a=>({type:'Feature',geometry:a.geometry,properties:{verified:true}})));for(const a of data.slice(0,30)){const b=el('div',null,'cap-item');line(b,a.event,a.severity);line(b,'Area',a.area);line(b,'Expires',a.expiry);const l=el('a',tr('المصدر الرسمي','Official record'));l.href=a.url;l.target='_blank';l.rel='noopener noreferrer';b.append(l);out.append(b);}});
+  button(feed,'إخفاء مناطق الرسائل','Hide alert areas',()=>{const m=getMap();if(m?.getLayer('cap-fill'))m.removeLayer('cap-fill');if(m?.getSource('cap-areas'))m.removeSource('cap-areas');});
+ }
+ function twinLab(){
+  const c=card('طبقات مبانٍ ثلاثية الأبعاد','3D building layers',tr('طبقة مبانٍ عامة OSM/OpenFreeMap أو استيراد GeoJSON. ارتفاعات تقريبية عند توفرها؛ لا تمثل مسحًا ميدانيًا أو توأمًا متزامنًا.','Public OSM/OpenFreeMap footprints or local GeoJSON; heights can be approximate. Not a surveyed or synchronized digital twin.'));
+  const live=button(c,'تحميل مباني OpenStreetMap','Load OpenStreetMap buildings',()=>{const m=currentMap();if(!m.getSource('osm-buildings'))m.addSource('osm-buildings',{type:'vector',url:'https://tiles.openfreemap.org/planet',attribution:'© OpenStreetMap contributors · OpenFreeMap'});if(!m.getLayer('osm-water'))m.addLayer({id:'osm-water',type:'fill',source:'osm-buildings','source-layer':'water',minzoom:12,paint:{'fill-color':'#1d4967','fill-opacity':0.85}},'quakes');if(!m.getLayer('osm-roads'))m.addLayer({id:'osm-roads',type:'line',source:'osm-buildings','source-layer':'transportation',minzoom:13,paint:{'line-color':'#9bb2ba','line-opacity':0.75,'line-width':['interpolate',['linear'],['zoom'],13,0.5,18,3]}},'quakes');if(!m.getLayer('osm-building-3d'))m.addLayer({id:'osm-building-3d',type:'fill-extrusion',source:'osm-buildings','source-layer':'building',minzoom:14,filter:['all',['has','render_height'],['>', ['to-number',['get','render_height'],0],0]],paint:{'fill-extrusion-height':['to-number',['get','render_height'],0],'fill-extrusion-base':['to-number',['get','render_min_height'],0],'fill-extrusion-color':['interpolate',['linear'],['to-number',['get','render_height'],0],0,'#699ab2',80,'#6ce4d4',250,'#a79cff'],'fill-extrusion-opacity':0.86}});state.mode='flat';m.setProjection({type:'mercator'});m.flyTo({center:[state.position.lon,state.position.lat],zoom:16,pitch:55,bearing:20});renderChrome();live.textContent=tr('OSM / OpenFreeMap: الارتفاعات تقديرية عند توفرها والتغطية غير مضمونة.','OSM / OpenFreeMap: estimated heights where available, coverage not guaranteed.');});
+  button(c,'إخفاء مباني OSM','Hide OSM buildings',()=>{const m=getMap();for(const id of ['osm-building-3d','osm-roads','osm-water'])if(m?.getLayer(id))m.removeLayer(id);if(m?.getSource('osm-buildings'))m.removeSource('osm-buildings');live.textContent='—';});
+  const out=fileField(c,'ملف المباني GeoJSON','Building GeoJSON file','.geojson,.json',5000000,(raw,o)=>{const d=buildings(JSON.parse(raw)),m=source('buildings',d);if(!m.getLayer('building-extrusion'))m.addLayer({id:'building-extrusion',type:'fill-extrusion',source:'buildings',paint:{'fill-extrusion-height':['get','height'],'fill-extrusion-base':['get','base'],'fill-extrusion-color':'#74c9db','fill-extrusion-opacity':0.85}});state.mode='flat';m.setProjection({type:'mercator'});let coords=d.features[0].geometry.coordinates;let point=d.features[0].geometry.type==='Polygon'?coords[0][0]:coords[0][0][0];m.flyTo({center:point,zoom:16,pitch:60,bearing:25});renderChrome();buildingOn=true;o.textContent=d.features.length+' buildings · imported';});
+  button(c,'حذف الطبقة','Remove layer',()=>{const m=getMap();if(m?.getLayer('building-extrusion'))m.removeLayer('building-extrusion');if(m?.getSource('buildings'))m.removeSource('buildings');buildingOn=false;out.textContent='—';});
+ }
+ function aiLab(){
+  const c=card('ZAMAKAN AI','ZAMAKAN AI',tr('مساعد توليدي محلي اختياري عبر Ollama، ويمكن إرفاق لقطة اختيارية من الطقس ومؤشر Kp مع مصدرها وتاريخها. لا يصدر تحذيرات.','Optional local generative assistant via Ollama; attach an explicitly selected weather/Kp snapshot with provenance. Not an official warning service.'));
+  const status=el('p',tr('التحقق من الخدمة…','Checking service…'),'tag');c.append(status);
+  const q=field(c,'السؤال','Question','textarea');q.rows=5;q.maxLength=4000;const attach=field(c,'إرفاق لقطة البيانات العلمية (دون الإحداثيات)','Attach science snapshot (no coordinates)','checkbox');const preview=el('pre',null,'ai-preview');c.append(preview);attach.onchange=()=>{preview.textContent=attach.checked?JSON.stringify(aiSnapshot(state.results),null,2):'';};
+  const out=button(c,'اسأل المساعد','Ask assistant',async()=>{if(!q.value.trim())throw Error('Enter a question');out.textContent=tr('جارٍ التوليد…','Generating…');const r=await fetch('./api/ai/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q.value,context:attach.checked?aiSnapshot(state.results):{}}),signal:AbortSignal.timeout(100000)});const d=await r.json();if(!r.ok)throw Error(d.error||'AI unavailable');out.textContent=d.model+' · '+tr('إجابة مولدة غير معتمدة','Unverified generated answer')+'\n\n'+d.text;});
+  const b=c.querySelector('button');b.disabled=true;
+  fetch('./api/ai/status',{signal:AbortSignal.timeout(4000),cache:'no-store'}).then(r=>r.json()).then(d=>{b.disabled=!d.enabled;status.textContent=d.enabled?tr('مهيأ محليًا، يتطلب نموذج Ollama مثبتًا','Locally configured; requires installed Ollama model'):tr('غير مفعّل — شغّل خادمًا محليًا واضبط ZAMAKAN_LOCAL_MODEL','Disabled — run local server with ZAMAKAN_LOCAL_MODEL');}).catch(()=>{status.textContent=tr('الخدمة غير متاحة في هذه النسخة','Service unavailable in this build');});
+ }
+ const funcs={ai:aiLab,radar:radarLab,orbit:orbitLab,models:modelsLab,fft:fftLab,cap:capLab,twin:twinLab};
+ return {has:tab=>!!funcs[tab],render(panel){if(lastTab===state.tab&&lastLang===state.lang&&view?.isConnected)return;clearInterval(timer);playing=false;cancelAnimationFrame(windFrame);clearWind();lastTab=state.tab;lastLang=state.lang;view=el('div',null,'lab-stack');panel.replaceChildren(view);funcs[state.tab]();},leave(){clearInterval(timer);playing=false;cancelAnimationFrame(windFrame);clearWind();lastTab=null;},tick(){if(orbitShown&&record&&!liveOrbit){try{orbitRender(state.at);}catch{clearOrbit();}}},liveTick(){if(!liveOrbit||!record||!orbitShown)return;try{const at=Date.now(),p=orbitAt(record,at),m=getMap();if(!m)return;if(at-orbitTrackAt>60000||!orbitPath){orbitRender(at);}else{m.getSource('orbits')?.setData({type:'FeatureCollection',features:[...orbitPath,{type:'Feature',geometry:{type:'Point',coordinates:[p.lon,p.lat]},properties:{name:record.name}}]});}const v=orbitReadout?.querySelector('.orbit-live-values');if(v)v.textContent=new Date(at).toISOString().slice(11,19)+' UTC · '+p.lat.toFixed(4)+'° / '+p.lon.toFixed(4)+'° · '+p.height.toFixed(1)+' km';}catch{clearOrbit();if(orbitReadout)orbitReadout.textContent='Orbital data unavailable or expired';}}};
+}

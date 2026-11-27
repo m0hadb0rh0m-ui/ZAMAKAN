@@ -48,3 +48,26 @@ npx cap open android
 - [Proposed PostGIS schema](docs/schema.sql)
 
 Open-Meteo free tier is for non-commercial use. No billing authorized or activated.
+
+## 0.2 — Glass Control Center (research preview)
+- Glass dashboard with responsive navigation, accessible focus states, map focus and reset.
+- SGP4 ground tracks via satellite.js (user-provided, checksummed TLE; ±7 days of epoch, not live telemetry). See [CelesTrak](https://celestrak.org/NORAD/elements/).
+- RainViewer historical radar playback (coverage and availability vary). Point wind particles represent the selected **model** location only; no global gridded wind field.
+- Compare ECMWF IFS, NOAA GFS and DWD ICON at a common UTC hour and location.
+- FFT radix-2 one-sided spectrum (4–65,536 evenly spaced finite samples).
+- Read CAP 1.2 XML locally (unverified imports; no issuer authentication, live alert feed or notifications).
+- Extrude user-provided GeoJSON polygons with numeric metre heights. No automatically sourced city models, terrain fusion or real-time digital twin.
+- Optional local generative assistant through Ollama, disabled by default. Run a model already installed in Ollama, then start the production server with `ZAMAKAN_LOCAL_MODEL` set to that model's exact name. It is accessible only at `http://127.0.0.1:4173`. No live-data tools, no paid API, no automatic model download. Static/PWA and Android packages do not expose the local model endpoint.
+- Windows x64 portable EXE build job uses Electron; the artifact is unsigned and must be tested on Windows before distribution. Desktop currently denies permission requests including GPS.
+- Cloud-ready via the existing Dockerfile; actual hosting, HTTPS certificates and public URL are not provisioned.
+
+See [0.2 validation and limitations](docs/UPGRADE-0.2.md).
+
+## 0.3 — Scientific operations upgrade
+Supersedes the 0.2 feature descriptions above: regional sampled weather-model wind particles, UTC-aligned forecast charts, OSM vector building profiles, NWS alert integration, worker-based FFT/PSD, local AI snapshot grounding, Windows portable packaging checks and cloud deployment templates.
+[Full implementation, testing, deployment instructions and known limitations](docs/UPGRADE-0.3.md).
+
+The public cloud and desktop release are not currently deployed or certified. Test fixtures are not live measurements.
+
+## 0.4 — Release candidate
+Adds persistent language/accessibility settings, local fonts, coherent vector icons, optional SQLite account backend, stronger security controls and updated NOAA space telemetry with civilian SGP4 second-by-second propagation. See [release candidate scope and security limitations](docs/UPGRADE-0.4.md).

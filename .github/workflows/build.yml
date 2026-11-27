@@ -2,6 +2,8 @@ name: ZAMAKAN build
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -54,3 +56,47 @@ jobs:
         with:
           name: ZAMAKAN-android-debug
           path: android/app/build/outputs/apk/debug/*.apk
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            desktop/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Stage desktop payload
+        shell: pwsh
+        run: |
+          Copy-Item -Recurse dist desktop/dist
+          Copy-Item -Recurse server desktop/server
+          Copy-Item -Recurse shared desktop/shared
+      - working-directory: desktop
+        run: npm ci
+      - working-directory: desktop
+        run: npm run package:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Launch packaged Windows app
+        shell: pwsh
+        run: |
+          $env:ZAMAKAN_SMOKE='1'
+          $p=Start-Process -FilePath desktop/release/win-unpacked/ZAMAKAN.exe -PassThru
+          if (-not $p.WaitForExit(45000)) { Stop-Process -Id $p.Id -Force; throw 'Desktop smoke timeout' }
+          if ($p.ExitCode -ne 0) { throw "Desktop smoke failed: $($p.ExitCode)" }
+      - name: Generate artifact checksums
+        shell: pwsh
+        run: Get-ChildItem desktop/release/*.exe | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" } | Set-Content desktop/release/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZAMAKAN-Windows-portable
+          path: |
+            desktop/release/*.exe
+            desktop/release/SHA256SUMS.txt
+          if-no-files-found: error

@@ -2,10 +2,10 @@
   "$schema": "http://cyclonedx.org/schema/bom-1.5.schema.json",
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
-  "serialNumber": "urn:uuid:4055e13a-e48e-425b-9bad-5314538f0cd9",
+  "serialNumber": "urn:uuid:156c5048-fa12-43f6-a735-8b46c1d1a6db",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-11-27T12:01:24.726Z",
+    "timestamp": "2026-11-27T12:35:00.391Z",
     "lifecycles": [
       {
         "phase": "build"
@@ -19,12 +19,12 @@
       }
     ],
     "component": {
-      "bom-ref": "zamakan@0.1.0",
+      "bom-ref": "zamakan@0.4.0",
       "type": "library",
       "name": "ZAMAKAN",
-      "version": "0.1.0",
+      "version": "0.4.0",
       "scope": "required",
-      "purl": "pkg:npm/zamakan@0.1.0",
+      "purl": "pkg:npm/zamakan@0.4.0",
       "properties": [
         {
           "name": "cdx:npm:package:private",
@@ -162,6 +162,82 @@
         {
           "license": {
             "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "@fontsource-variable/inter@5.3.0",
+      "type": "library",
+      "name": "@fontsource-variable/inter",
+      "version": "5.3.0",
+      "scope": "required",
+      "author": "Google Inc.",
+      "description": "Self-host the Inter font in a neatly bundled NPM package.",
+      "purl": "pkg:npm/%40fontsource-variable/inter@5.3.0",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/@fontsource-variable/inter/-/inter-5.3.0.tgz"
+        },
+        {
+          "type": "vcs",
+          "url": "git+https://github.com/fontsource/font-files.git"
+        },
+        {
+          "type": "website",
+          "url": "https://fontsource.org/fonts/inter"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "3aea4be3cbdae093687dbf7bc3a358785f52ed6fe41cd28cd04afc0de9b99ea8b88de38bad5243a04f2d644a673099ad92f35b0751083cfc0771d905e9bd6850"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "OFL-1.1"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "@fontsource-variable/noto-sans-arabic@5.3.0",
+      "type": "library",
+      "name": "@fontsource-variable/noto-sans-arabic",
+      "version": "5.3.0",
+      "scope": "required",
+      "author": "Google Inc.",
+      "description": "Self-host the Noto Sans Arabic font in a neatly bundled NPM package.",
+      "purl": "pkg:npm/%40fontsource-variable/noto-sans-arabic@5.3.0",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/@fontsource-variable/noto-sans-arabic/-/noto-sans-arabic-5.3.0.tgz"
+        },
+        {
+          "type": "vcs",
+          "url": "git+https://github.com/fontsource/font-files.git"
+        },
+        {
+          "type": "website",
+          "url": "https://fontsource.org/fonts/noto-sans-arabic"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "473f3e0c1cf36b7fff72637e0c141a8c9871df1f83c75d9e5209d0b133a03d66ce4f4f889fa00f984f33e08fd04275167c0c7eb3c97ddfeeb4a834f9bc91f5b0"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "OFL-1.1"
           }
         }
       ]
@@ -4131,6 +4207,48 @@
       ]
     },
     {
+      "bom-ref": "satellite.js@6.0.1",
+      "type": "library",
+      "name": "satellite.js",
+      "version": "6.0.1",
+      "scope": "required",
+      "author": "Shashwat Kandadai <shashwatak@gmail.com> (https://github.com/shashwatak)",
+      "description": "SGP4/SDP4 calculation library",
+      "purl": "pkg:npm/satellite.js@6.0.1",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/satellite.js/-/satellite.js-6.0.1.tgz"
+        },
+        {
+          "type": "vcs",
+          "url": "git://github.com/shashwatak/satellite-js"
+        },
+        {
+          "type": "website",
+          "url": "https://github.com/shashwatak/satellite-js"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "https://github.com/shashwatak/satellite-js/issues"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "4f4aa92984a53481fd2f4c98d52445d89e977d5f534e866e0cd05749e4d6f4ae9f3799307f8ba2773937faae918382951e26dc2da8ab7bdd740b8ef26a2d16f4"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
       "bom-ref": "sax@1.1.4",
       "type": "library",
       "name": "sax",
@@ -5559,11 +5677,14 @@
   ],
   "dependencies": [
     {
-      "ref": "zamakan@0.1.0",
+      "ref": "zamakan@0.4.0",
       "dependsOn": [
         "@capacitor/android@8.6.3",
         "@capacitor/core@8.6.3",
+        "@fontsource-variable/inter@5.3.0",
+        "@fontsource-variable/noto-sans-arabic@5.3.0",
         "maplibre-gl@6.19.0",
+        "satellite.js@6.0.1",
         "@capacitor/cli@8.6.3",
         "vite@8.4.0"
       ]
@@ -5602,6 +5723,14 @@
       "dependsOn": [
         "tslib@2.9.1"
       ]
+    },
+    {
+      "ref": "@fontsource-variable/inter@5.3.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "@fontsource-variable/noto-sans-arabic@5.3.0",
+      "dependsOn": []
     },
     {
       "ref": "@ionic/cli-framework-output@2.2.8",
@@ -6183,6 +6312,10 @@
     },
     {
       "ref": "safe-buffer@5.2.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "satellite.js@6.0.1",
       "dependsOn": []
     },
     {
