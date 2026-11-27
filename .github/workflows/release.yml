@@ -1,0 +1,82 @@
+name: ZAMAKAN signed commercial release
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: "Increasing Google Play version code"
+        required: true
+        type: string
+      version_name:
+        description: "Release version (e.g. 1.0.0)"
+        required: true
+        type: string
+      owner_approved:
+        description: "Owner confirms commercial licenses, privacy, real-device acceptance and upload certificate"
+        required: true
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: zamakan-production-release
+  cancel-in-progress: false
+jobs:
+  release:
+    if: inputs.owner_approved == true && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/zamakan-ultra-map-ui')
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      VITE_RELEASE_MODE: commercial
+      VITE_MAPTILER_PUBLIC_KEY: ${{ secrets.MAPTILER_PUBLIC_KEY }}
+      VITE_CESIUM_PUBLIC_TOKEN: ${{ secrets.CESIUM_PUBLIC_TOKEN }}
+      VITE_WEATHER_API_BASE: ${{ vars.WEATHER_API_BASE }}
+      ZAMAKAN_VERSION_CODE: ${{ inputs.version_code }}
+      ZAMAKAN_VERSION_NAME: ${{ inputs.version_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - run: npm test
+      - run: npm audit --audit-level=high
+      - run: node scripts/release-preflight.mjs
+      - run: npm run build
+      - run: npm run android:init
+      - run: npm run android:sync
+      - name: Sign release APK and AAB
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_B64 }}
+          ZAMAKAN_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ZAMAKAN_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ZAMAKAN_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          EXPECTED_UPLOAD_SHA256: ${{ vars.ANDROID_UPLOAD_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          export ZAMAKAN_KEYSTORE_PATH="$RUNNER_TEMP/zamakan-upload.p12"
+          trap 'rm -f "$ZAMAKAN_KEYSTORE_PATH"' EXIT
+          test -n "$KEYSTORE_B64" && test -n "$EXPECTED_UPLOAD_SHA256"
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$ZAMAKAN_KEYSTORE_PATH"
+          unset KEYSTORE_B64
+          node scripts/android-release.mjs
+          cd android
+          ./gradlew assembleRelease bundleRelease --no-daemon
+          cd ..
+          bash scripts/verify-android-release.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZAMAKAN-commercial-signed
+          path: |
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/bundle/release/*.aab
+            release-checksums.sha256
+          if-no-files-found: error
+          retention-days: 30

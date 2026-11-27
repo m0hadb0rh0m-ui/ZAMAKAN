@@ -1,3 +1,4 @@
+import {COMMERCIAL,weatherEndpoint,weatherKinds} from './release-config.js';
 export const SOURCES = {
  earthquakes:{name:'USGS',url:'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson',docs:'https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php',kind:'observed',ttl:90000},
  hazards:{name:'NASA EONET',url:'https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=100',docs:'https://eonet.gsfc.nasa.gov/docs/v3',kind:'reported',ttl:900000},
@@ -43,7 +44,8 @@ export async function fetchSource(key,query='',fetcher=globalThis.fetch){
  if(old&&now-old.retrieved<s.ttl)return {...old,state:'cached'};
  if(inflight.has(id))return inflight.get(id);
  const task=(async()=>{try{
- const res=await fetcher(s.url+(query?(s.url.includes('?')?'&':'?')+query:''),{signal:AbortSignal.timeout(18000),credentials:'omit',referrerPolicy:'no-referrer'});
+ const url=weatherKinds.includes(key)?weatherEndpoint(key):s.url;
+ const res=await fetcher(url+(query?(url.includes('?')?'&':'?')+query:''),{signal:AbortSignal.timeout(18000),credentials:'omit',referrerPolicy:'no-referrer'});
  if(!res.ok)throw Error('HTTP '+res.status);
  const raw=await res.json();
  const data=key==='earthquakes'?earthquakes(raw):key==='hazards'?hazards(raw):key==='space'?kp(raw):model(raw);
@@ -56,6 +58,7 @@ export function distance(a,b){const r=Math.PI/180,dlat=(b.lat-a.lat)*r,dlon=(b.l
 export function eventsAt(events,at){return events.filter(e=>Date.parse(e.time)<=at);}
 export function nearestHour(data,at){const hours=data?.hourly?.time;if(!hours?.length)return null;const i=hours.findIndex(t=>Date.parse(iso(t))>=at);return i<0?null:{time:iso(hours[i]),values:Object.fromEntries(Object.entries(data.hourly).filter(([k,v])=>k!=='time'&&Array.isArray(v)).map(([k,v])=>[k,v[i]]))};}
 export async function geocode(name,language='ar',fetcher=globalThis.fetch){
+ if(COMMERCIAL)throw Error('Use licensed geocoding in commercial builds');
  const q=String(name).trim();if(q.length<2||q.length>80)throw Error('Invalid search term');
  const params=new URLSearchParams({name:q,count:'6',language:language==='ar'?'ar':'en',format:'json'});
  const r=await fetcher('https://geocoding-api.open-meteo.com/v1/search?'+params,{credentials:'omit',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(18000)});

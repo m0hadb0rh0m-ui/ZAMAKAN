@@ -1,3 +1,5 @@
+import {COMMERCIAL} from './release-config.js';
+import {lookupMunicipalHeight} from './municipal-height.js';
 import {validCoords} from './data.js';
 // Explicit OSM height tags are recorded claims, not proof of a survey.
 export function parseHeight(value){
@@ -45,6 +47,9 @@ export async function lookupHeight(lon,lat,renderHeight,{signal,fetcher=globalTh
  if(!validCoords(lon,lat))throw Error('Invalid coordinate');
  const key=lon.toFixed(5)+','+lat.toFixed(5),cached=cache.get(key);
  if(cached&&Date.now()-cached.at<600000)return cached.result;
+ // Prefer a real municipal record within its geographic coverage.
+ try{const municipal=await lookupMunicipalHeight(lon,lat,{signal,fetcher});if(municipal){if(cache.size>=50)cache.delete(cache.keys().next().value);cache.set(key,{at:Date.now(),result:municipal});return municipal;}}catch(e){if(signal?.aborted)throw e;}
+ if(COMMERCIAL)return classifyHeight({},renderHeight);
  // Single explicitly requested building lookup. Not a bulk crawler.
  const query='[out:json][timeout:12][maxsize:16777216];(way(around:100,'+lat.toFixed(6)+','+lon.toFixed(6)+')[building];relation(around:100,'+lat.toFixed(6)+','+lon.toFixed(6)+')[building];);out meta geom;';
  const timeout=AbortSignal.timeout(15000);

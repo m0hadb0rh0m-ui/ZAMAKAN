@@ -8,3 +8,6 @@ android/
 .env.*
 !.env.example
 android-benchmark-results/
+*.jks
+*.p12
+release-checksums.sha256

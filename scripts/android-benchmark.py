@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Capture raw measurements on a connected physical Android phone, not an emulator."""
-import argparse, json, pathlib, shutil, subprocess, sys, time
+import argparse, json, pathlib, shutil, subprocess, sys, time, uuid
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--serial',help='ADB serial of the explicitly selected physical phone')
 p.add_argument('--seconds',type=int,default=300,help='Manual interaction duration (seconds)')
 p.add_argument('--out',type=pathlib.Path,default=pathlib.Path('android-benchmark-results'))
+p.add_argument('--perfetto',action='store_true',help='Capture a 30-second device-wide Perfetto trace (may contain private process names; keep local)')
 a=p.parse_args()
 if a.seconds<60: p.error('Allow at least 60 seconds of interaction')
 if not shutil.which('adb'): sys.exit('BLOCKED: adb unavailable; install Android platform-tools and connect a physical phone.')
@@ -35,7 +36,22 @@ input('Open the map, grant location if appropriate, ensure no private content is
 shell('dumpsys','gfxinfo',package,'reset')
 capture('before')
 print('Perform manual gestures listed in metadata for',a.seconds,'seconds. Keep network and brightness fixed.',flush=True)
-time.sleep(a.seconds)
+if a.perfetto:
+    trace='/data/misc/perfetto-traces/zamakan-'+uuid.uuid4().hex+'.perfetto-trace'
+    print('Perfetto: perform the gestures repeatedly for the first 30 seconds.',flush=True)
+    start=time.monotonic()
+    try:
+        adb('shell','perfetto','-o',trace,'-t','30s','-b','64mb','sched','freq','gfx','view','webview','input','power')
+        adb('pull',trace,str(a.out/'gesture.perfetto-trace'))
+        meta['perfetto']='recorded; inspect locally with Perfetto UI'
+    except subprocess.CalledProcessError:
+        meta['perfetto']='unavailable on this device'
+    finally:
+        try: shell('rm','-f',trace)
+        except subprocess.CalledProcessError: pass
+    time.sleep(max(0,a.seconds-(time.monotonic()-start)))
+else:
+    time.sleep(a.seconds)
 capture('after')
 meta['manual_observations']=input('Describe observed gesture lag, crashes, GPS results, and charging/thermal conditions: ')
 (a.out/'metadata.json').write_text(json.dumps(meta,indent=2,ensure_ascii=False))

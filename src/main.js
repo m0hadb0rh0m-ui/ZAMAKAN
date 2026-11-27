@@ -1,3 +1,4 @@
+import {COMMERCIAL,CONFIGURED_ION,WEATHER_BASE} from './release-config.js';
 import {Capacitor} from '@capacitor/core';
 import * as maplibregl from 'maplibre-gl';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
@@ -29,7 +30,7 @@ const doc=id=>link(SOURCES[id].docs,SOURCES[id].name);
 const empty=()=>'<p class="muted">'+tr('لا توجد بيانات موثوقة متاحة الآن.','No reliable data available now.')+'</p>';
 const btn=(id,ic,label,cls='')=>'<button type="button" id="'+id+'" class="'+cls+'" aria-label="'+label+'" title="'+label+'">'+icon(ic)+'</button>';
 $('app').innerHTML=`<main class="map-shell">
- <div class="maparea"><div id="map" aria-label="Interactive world map"></div><div id="maperror" role="status" hidden></div></div>
+ <div class="maparea"><div id="map" aria-label="Interactive world map"></div><div id="maperror" role="status" hidden></div><a id="maptilerCredit" hidden href="https://www.maptiler.com/copyright/" target="_blank" rel="noopener noreferrer"><img data-src="https://api.maptiler.com/resources/logo.svg" alt="MapTiler"> © MapTiler</a></div>
  <header class="floating-header"><div class="brand"><img src="./icon.svg" alt=""><div><b>زَمَكان <span>ULTRA</span></b><small>EARTH & SPACE</small></div></div>
  <div class="searchbar"><form id="searchform"><input id="searchinput" maxlength="120" type="search" aria-label="Location search" autocomplete="off" placeholder="ابحث عن مكان أو عنوان"><button id="searchbutton" aria-label="Search" type="submit">${icon('search')}</button></form><div id="searchresults" aria-live="polite"></div></div>
  ${btn('settings','settings','Settings','square')}</header>
@@ -106,7 +107,7 @@ function closeReality(){
 $('closeReality').onclick=closeReality;
 $('openRealistic').onclick=async()=>{
  let token;
- try{token=ionToken($('ionToken').value);}catch{$('ionStatus').textContent=tr('أدخل رمز Cesium ion للعميل المصرح له.','Enter an authorized Cesium ion client token.');return;}
+ try{token=ionToken($('ionToken').value||CONFIGURED_ION);}catch{$('ionStatus').textContent=tr('أدخل رمز Cesium ion للعميل المصرح له.','Enter an authorized Cesium ion client token.');return;}
  realityAbort?.abort();const ctl=new AbortController();realityAbort=ctl;$('openRealistic').disabled=true;$('ionToken').value='';
  $('realityPanel').hidden=false;$('map').style.visibility='hidden';map?.stop();
  $('realityStatus').textContent=tr('تحميل المجسمات من المزود المرخص…','Loading licensed photorealistic tiles…');
@@ -161,10 +162,10 @@ function heightCard(place){
  if(place.heightState==='loading')detail=tr('جارٍ التحقق…','Checking building source…');
  else if(place.heightState==='failed')detail=tr('تعذر الوصول إلى المصدر؛ الارتفاع غير موثّق.','Source unavailable; height remains unverified.');
  else if(h){
-  const labels={recorded:tr('ارتفاع مسجل في OSM (ليس قياسًا مستقلاً)','Height recorded in OSM (not independently surveyed)'), 'estimated-levels':tr('تقدير من الطوابق × ٣ م','Estimated from levels × 3 m'),'render-only':tr('ارتفاع رسم غير موثّق','Unverified render height'),unknown:tr('لا يوجد ارتفاع مسجل','No recorded height'),ambiguous:tr('لم تُحدَّد مطابقة فريدة للمبنى','No unique building match')};
+  const labels={'municipal-record':tr('ارتفاع السقف في السجل البلدي الرسمي (ليس شهادة مساحية)','Official municipal roof-height record (not a survey certificate)'),recorded:tr('ارتفاع مسجل في OSM (ليس قياسًا مستقلاً)','Height recorded in OSM (not independently surveyed)'), 'estimated-levels':tr('تقدير من الطوابق × ٣ م','Estimated from levels × 3 m'),'render-only':tr('ارتفاع رسم غير موثّق','Unverified render height'),unknown:tr('لا يوجد ارتفاع مسجل','No recorded height'),ambiguous:tr('لم تُحدَّد مطابقة فريدة للمبنى','No unique building match')};
   detail=labels[h.kind]+(h.meters!=null?' · '+fmt(h.meters,'m'):'')+(h.source?' · '+h.source:'')+(h.edited?' · '+tr('آخر تعديل للسجل: ','Record last edited: ')+date(h.edited):'');
  }
- return '<div class="height-info">'+(detail?'<small class="height-detail">'+safe(detail)+'</small>':'')+(h?.sourceRecords?link(h.sourceRecords,tr('سجل المبنى في OpenStreetMap','OpenStreetMap building record')):'')+'<button id="inspectHeight" '+(place.heightState==='loading'?'disabled':'')+'>'+tr('تحقق من مصدر الارتفاع','Check height provenance')+'</button></div>';
+ return '<div class="height-info">'+(detail?'<small class="height-detail">'+safe(detail)+'</small>':'')+(h?.sourceRecords?link(h.sourceRecords,h.kind==='municipal-record'?tr('السجل البلدي الرسمي','Official municipal record'):tr('سجل المبنى في OpenStreetMap','OpenStreetMap building record')):'')+'<button id="inspectHeight" '+(place.heightState==='loading'?'disabled':'')+'>'+tr('تحقق من مصدر الارتفاع','Check height provenance')+'</button></div>';
 }
 $('coord').addEventListener('click',e=>{if(e.target.closest('#reverse'))reverseSelected();if(e.target.closest('#inspectHeight'))inspectHeight();});
 function setImagery(){
@@ -236,7 +237,9 @@ function renderChrome(){
  $('imagery').textContent=tr('رصد NASA MODIS','NASA MODIS observation');$('terrainLabel').textContent=tr('ارتفاعات التضاريس DEM','DEM elevation');$('terrain').disabled=!MAPTILER_KEY;$('terrain').checked=state.terrain;
  $('layerHelp').textContent=(['satellite','hybrid'].includes(state.base)?tr('تاريخ التقاط الصور غير متاح من النمط؛ قد تختلف الدقة والحداثة حسب المنطقة. ','Acquisition date not supplied by this style; imagery detail and age vary by area. '):'')+tr('ارتفاعات المباني من OpenMapTiles قد تكون محسوبة أو تقديرية؛ لا يمكن تأكيدها من هذا المصدر.','OpenMapTiles building heights may be derived or estimated; provenance is not supplied.')+(MAPTILER_KEY?'':tr(' الصور التجارية والتضاريس تتطلب مفتاحًا.',' Imagery and DEM require an approved key.'));
  $('providerTitle').textContent=tr('مزودو الخرائط المرخصون','Licensed map providers');$('mapKeyLabel').textContent=tr('مفتاح MapTiler العام للعميل (لا يُحفظ)','Public MapTiler client key (not stored)');$('mapKeyLink').textContent=tr('الحصول على مفتاح MapTiler','Get a MapTiler key');$('activateMapKey').textContent=tr('تحقق وفعّل صور HD','Validate & enable HD');$('clearMapKey').textContent=tr('إزالة المفتاح','Remove key');$('ionLabel').textContent=tr('رمز Cesium ion للعميل المصرح للعرض الواقعي','Cesium ion client token with photorealistic entitlement');$('ionLink').textContent=tr('إعداد ترخيص Cesium ion','Configure Cesium ion');$('openRealistic').textContent=tr('عرض 3D الواقعي','Open photorealistic 3D');$('closeReality').textContent=tr('العودة للخريطة','Back to map');$('lowPowerLabel').textContent=tr('وضع توفير الطاقة (دقة رسم أقل)','Power saver (lower render resolution)');$('lowPower').checked=lowPower;
- $('settingsTitle').textContent=tr('الإعدادات','Settings');$('settingsHint').textContent=tr('البحث يستخدم Photon/OSM (خدمة عامة محدودة) أو MapTiler؛ وقد يرسل الطقس الإحداثيات إلى المزود. إعداد MapTiler موثّق في المستودع.','Search uses Photon/OSM (limited public instance) or MapTiler; weather may send coordinates to providers. MapTiler setup is documented in the repository.');
+ const mt=isCommercialMode(state.base)&&Boolean(MAPTILER_KEY);$('maptilerCredit').hidden=!mt;if(mt){const logo=$('maptilerCredit').querySelector('img');if(!logo.src)logo.src=logo.dataset.src;}
+ if(COMMERCIAL){$('mapKey').hidden=true;$('mapKeyLabel').textContent=tr('مزود الصور: إعداد النشر التجاري','Imagery: commercial deployment configuration');$('activateMapKey').hidden=true;$('clearMapKey').hidden=true;$('ionToken').hidden=true;$('ionLabel').textContent=tr('المجسمات: رمز العميل المصرح به في إعداد النشر','3D: deployment-authorized client token');$('openRealistic').disabled=!CONFIGURED_ION||!$('realityPanel').hidden; if(!WEATHER_BASE)$('weatherLayerStatus').textContent=tr('بوابة الطقس التجارية غير مهيأة','Licensed weather gateway not configured');}
+ $('settingsTitle').textContent=tr('الإعدادات','Settings');$('settingsHint').textContent=COMMERCIAL?tr('يستخدم البحث مزود MapTiler المرخص؛ قد ترسل الخرائط والطقس الإحداثيات إلى مزودي البيانات.','Search uses licensed MapTiler; maps and weather may send coordinates to service providers.'):tr('البحث يستخدم Photon/OSM (خدمة عامة محدودة) أو MapTiler؛ وقد يرسل الطقس الإحداثيات إلى المزود. إعداد MapTiler موثّق في المستودع.','Search uses Photon/OSM (limited public instance) or MapTiler; weather may send coordinates to providers. MapTiler setup is documented in the repository.');
  $('theme').innerHTML=icon('theme')+tr('المظهر','Appearance');$('refresh').innerHTML=icon('refresh')+tr('تحديث البيانات والخريطة','Refresh data and map');
  $('sheetTitle').textContent=tr('المرصد العلمي','Science observatory');
  for(const [selector,ar,en] of [['#explore','استكشاف','Explore'],['.bottom-nav [data-tab=weather]','الطقس','Weather'],['.bottom-nav [data-tab=disasters]','الأحداث','Events'],['.bottom-nav [data-tab=earth]','المرصد','Observatory']]){let b=document.querySelector(selector);b.querySelector('span').textContent=tr(ar,en);b.classList.toggle('active',b.id==='explore'?$('sheet').hidden:!$('sheet').hidden&&b.dataset.tab===state.tab);}

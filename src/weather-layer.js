@@ -1,3 +1,4 @@
+import {weatherEndpoint} from './release-config.js';
 import {SOURCES,validCoords} from './data.js';
 export const WEATHER_FIELDS={
  temperature_2m:{unit:'°C',stops:[[-20,'#3965bc'],[0,'#70b8df'],[15,'#65b988'],[25,'#e9ba54'],[40,'#d8564e']]},
@@ -30,7 +31,7 @@ export async function fetchWeatherGrid(points,signal,fetcher=globalThis.fetch){
  if(!points.length||points.length>25||points.some(p=>!validCoords(p.lon,p.lat)))throw Error('Invalid weather sample grid');
  const query=new URLSearchParams({latitude:points.map(p=>p.lat.toFixed(3)).join(','),longitude:points.map(p=>p.lon.toFixed(3)).join(','),current:Object.keys(WEATHER_FIELDS).join(','),timezone:'GMT',cell_selection:'nearest'});
  const timeout=AbortSignal.timeout(18000);
- const res=await fetcher(SOURCES.weather.url+'?'+query,{signal:signal?AbortSignal.any([signal,timeout]):timeout,credentials:'omit'});
+ const res=await fetcher(weatherEndpoint('weather')+'?'+query,{signal:signal?AbortSignal.any([signal,timeout]):timeout,credentials:'omit'});
  if(!res.ok)throw Error('Weather grid HTTP '+res.status);
  const features=weatherFeatures(await res.json());
  return {type:'FeatureCollection',features};

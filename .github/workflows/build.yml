@@ -36,6 +36,12 @@ jobs:
         with:
           name: ZAMAKAN-web
           path: dist/
+      - name: Verify commercial profile fails closed without credentials
+        run: |
+          VITE_RELEASE_MODE=commercial npm run build
+          PORT=4174 node server/index.js &
+          sleep 2
+          ZAMAKAN_URL=http://127.0.0.1:4174 python tests/commercial_smoke.py
   android:
     runs-on: ubuntu-latest
     steps:
@@ -61,3 +67,30 @@ jobs:
           path: |
             android/app/build/outputs/apk/debug/*.apk
             android/app/build/outputs/bundle/debug/*.aab
+
+      - name: Verify release signing pipeline with a disposable test certificate
+        env:
+          ZAMAKAN_VERSION_CODE: '1'
+          ZAMAKAN_VERSION_NAME: '1.0.0-test'
+        run: |
+          set -euo pipefail
+          umask 077
+          export ZAMAKAN_KEYSTORE_PATH="$RUNNER_TEMP/zamakan-disposable-test.p12"
+          export ZAMAKAN_STORE_PASSWORD="$(openssl rand -hex 24)"
+          export ZAMAKAN_KEY_PASSWORD="$ZAMAKAN_STORE_PASSWORD"
+          export ZAMAKAN_KEY_ALIAS=test
+          trap 'rm -f "$ZAMAKAN_KEYSTORE_PATH"' EXIT
+          keytool -genkeypair -storetype PKCS12 -keystore "$ZAMAKAN_KEYSTORE_PATH" -storepass:env ZAMAKAN_STORE_PASSWORD -keypass:env ZAMAKAN_KEY_PASSWORD -alias test -keyalg RSA -keysize 3072 -validity 2 -dname "CN=ZAMAKAN DISPOSABLE CI TEST"
+          export EXPECTED_UPLOAD_SHA256="$(keytool -list -v -keystore "$ZAMAKAN_KEYSTORE_PATH" -storepass:env ZAMAKAN_STORE_PASSWORD -alias test | awk -F 'SHA256: ' '/SHA256:/{print $2;exit}')"
+          node scripts/android-release.mjs
+          (cd android && ./gradlew assembleRelease bundleRelease --no-daemon)
+          bash scripts/verify-android-release.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZAMAKAN-release-signing-test-NOT-FOR-STORE
+          path: |
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/bundle/release/*.aab
+            release-checksums.sha256
+          if-no-files-found: error
+          retention-days: 7
