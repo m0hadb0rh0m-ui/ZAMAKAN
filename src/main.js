@@ -3,10 +3,11 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 maplibregl.setWorkerUrl(new URL(workerUrl, location.href).href);
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './style.css';
+import {MAPTILER_KEY,fetchStyle,restoreOverlays,addScientific,setBuildings,setTerrain,zoomFor,gpsZoom,motion} from './map-engine.js';
 import {SOURCES,fetchSource,weatherParams,eventsAt,nearestHour,distance,validCoords,iso,geocode,gibsTiles} from './data.js';
 
 const $=id=>document.getElementById(id);
-const state={lang:'ar',mode:'globe',tab:'earth',position:{lon:34.31,lat:31.35},results:{},events:[],layers:{earthquake:true,wildfires:true,other:true},at:Date.now(),offset:0,playing:false,measure:false,points:[],request:0};
+const state={lang:'ar',mode:'flat',base:'streets',buildings:false,terrain:false,tab:'earth',position:{lon:34.31,lat:31.35},results:{},events:[],layers:{earthquake:true,wildfires:true,other:true},at:Date.now(),offset:0,playing:false,measure:false,points:[],request:0};
 const tr=(ar,en)=>state.lang==='ar'?ar:en;
 const tabs=[['earth','◉','الأرض','Earth'],['weather','☁','الطقس','Weather'],['disasters','⚠','الكوارث','Disasters'],['space','✦','الفضاء','Space'],['air','◈','البيئة','Environment'],['marine','≈','المحيطات','Oceans'],['sources','▤','المصادر','Sources'],['analysis','∿','التحليل','Analysis']];
 const colors={earthquake:'#ffb15e',wildfires:'#ff617a',other:'#67d5f4'};
@@ -23,18 +24,52 @@ const toolBar=document.createElement('div');toolBar.className='searchbar';toolBa
 $('imageDate').value=new Date(Date.now()-2*86400000).toISOString().slice(0,10);$('imageDate').max=new Date().toISOString().slice(0,10);$('imageDate').min='2000-02-24';
 let searchResults=[],searchSequence=0,imagery=false;
 $('searchform').onsubmit=async e=>{e.preventDefault();let seq=++searchSequence;$('searchresults').textContent=tr('جارٍ البحث…','Searching…');try{const found=await geocode($('searchinput').value,state.lang);if(seq!==searchSequence)return;searchResults=found;$('searchresults').innerHTML=found.length?found.map((x,i)=>'<button data-place="'+i+'">'+safe([x.name,x.admin,x.country].filter(Boolean).join(' · '))+'</button>').join(''):tr('لا نتائج','No matches');}catch{$('searchresults').textContent=tr('تعذر البحث','Search unavailable');}};
-$('searchresults').addEventListener('click',e=>{let id=e.target.closest('[data-place]')?.dataset.place;if(id!==undefined&&searchResults[id]){let x=searchResults[id];selectPosition(x.lon,x.lat);if(mapReady)map.flyTo({center:[x.lon,x.lat],zoom:5});$('searchresults').textContent='';}});
-function setImagery(){if(!mapReady){$('imageStatus').textContent=tr('الخريطة غير جاهزة','Map not ready');return;}try{if(map.getLayer('satellite'))map.removeLayer('satellite');if(map.getSource('satellite'))map.removeSource('satellite');if(imagery){map.addSource('satellite',{type:'raster',tiles:gibsTiles($('imageDate').value),tileSize:256,maxzoom:9,attribution:'NASA EOSDIS GIBS · MODIS Terra'});map.addLayer({id:'satellite',type:'raster',source:'satellite',paint:{'raster-opacity':1}},'quakes');$('imageStatus').textContent=tr('صور NASA MODIS اليومية؛ تاريخ الطلب ','NASA MODIS daily imagery; requested date ')+$('imageDate').value;}else $('imageStatus').textContent='';$('imagery').classList.toggle('active',imagery);}catch{ $('imageStatus').textContent=tr('الصور غير متاحة','Imagery unavailable'); }}
+$('searchresults').addEventListener('click',e=>{let id=e.target.closest('[data-place]')?.dataset.place;if(id!==undefined&&searchResults[id]){let x=searchResults[id];selectPosition(x.lon,x.lat);if(mapReady)map.flyTo({center:[x.lon,x.lat],zoom:zoomFor(x.type||'city'),duration:motion()});$('searchresults').textContent='';}});
+function setImagery(){
+ if(!mapReady)return;
+ try{addScientific(map,imagery?gibsTiles($('imageDate').value):null);$('imageStatus').textContent=imagery?tr('رصد علمي MODIS — تاريخ الطلب ','MODIS scientific observation — requested date ')+$('imageDate').value:'';$('imagery').classList.toggle('active',imagery);}catch{$('imageStatus').textContent=tr('الصور غير متاحة','Imagery unavailable');}
+}
 $('imagery').onclick=()=>{imagery=!imagery;setImagery();};$('imageDate').onchange=()=>{if(imagery)setImagery();};
-let map, mapReady=false;
+let map,mapReady=false,styleRequest,styleSequence=0,activeStyle='streets';
+function mapMessage(message){$('maperror').textContent=message;$('maperror').hidden=!message;}
+async function changeStyle(mode){
+ if(!map)return;
+ styleRequest?.abort();styleRequest=new AbortController();const seq=++styleSequence;
+ const timer=setTimeout(()=>styleRequest?.abort(),20000);
+ mapMessage(tr('جارٍ تحميل الخريطة…','Loading map…'));
+ try{
+  const style=await fetchStyle(mode,styleRequest.signal);
+  if(seq!==styleSequence)return;
+  mapReady=false;activeStyle=mode;
+  map.setStyle(style,{diff:false});state.base=mode;
+ }catch(e){
+  if(seq!==styleSequence)return;
+  mapMessage(tr('تعذر الاتصال بمصدر الخريطة. اضغط تحديث للمحاولة مجددًا.','Map provider unavailable. Press refresh to retry.'));
+ }finally{clearTimeout(timer);}
+}
 try{
- map=new maplibregl.Map({container:'map',style:{version:8,sources:{land:{type:'geojson',data:import.meta.env.BASE_URL+'land.geojson'},events:{type:'geojson',data:{type:'FeatureCollection',features:[]}},selection:{type:'geojson',data:{type:'FeatureCollection',features:[]}},measure:{type:'geojson',data:{type:'FeatureCollection',features:[]}}},layers:[{id:'ocean',type:'background',paint:{'background-color':'#102d43'}},{id:'land',type:'fill',source:'land',paint:{'fill-color':'#38665e','fill-outline-color':'#6a9b88'}},{id:'quakes',type:'circle',source:'events',paint:{'circle-color':['get','color'],'circle-radius':['interpolate',['linear'],['zoom'],0,3,6,7,12,10],'circle-stroke-width':1,'circle-stroke-color':'#ffe8c8','circle-opacity':0.82}},{id:'measureline',type:'line',source:'measure',paint:{'line-color':'#fff09a','line-width':3}},{id:'selection',type:'circle',source:'selection',paint:{'circle-color':'#45f4d4','circle-radius':7,'circle-stroke-color':'#fff','circle-stroke-width':2}}]},center:[34.31,31.35],zoom:1.35,attributionControl:{compact:true}});
- map.addControl(new maplibregl.NavigationControl(),'bottom-left');
- map.addControl(new maplibregl.AttributionControl({customAttribution:'Natural Earth • public domain | USGS • NASA • NOAA'}),'bottom-right');
- map.on('load',()=>{mapReady=true;if(imagery)setImagery();map.setProjection({type:'globe'});updateMap();});
- map.on('error',e=>{if(imagery){$('imageStatus').textContent=tr('بعض مربعات صور NASA قد تكون غير متاحة','Some NASA imagery tiles may be unavailable');}if(!mapReady){$('maperror').hidden=false;$('maperror').textContent=tr('تعذر تحميل الخريطة. البيانات النصية متاحة.','Map loading failed. Text data remains available.');}});
- map.on('click',e=>{if(!validCoords(e.lngLat.lng,e.lngLat.lat))return;const found=map.queryRenderedFeatures(e.point,{layers:['quakes']})[0];if(found&&!state.measure){const item=state.events.find(x=>x.id===found.properties.id);if(item){showEvent(item);return;}}selectPosition(e.lngLat.lng,e.lngLat.lat);});
-}catch(e){$('maperror').hidden=false;$('maperror').textContent='WebGL unavailable / تعذر تشغيل الخرائط';}
+ map=new maplibregl.Map({container:'map',style:{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#dce7ed'}}]},center:[34.31,31.35],zoom:10.5,maxZoom:20,maxPitch:75,attributionControl:{compact:true},maxTileCacheSize:160});
+ map.addControl(new maplibregl.ScaleControl({maxWidth:100}),'bottom-left');
+ map.on('style.load',()=>{
+  if(!map.getStyle().sources||!Object.values(map.getStyle().sources).some(s=>s.type==='vector'||s.type==='raster'))return;
+  restoreOverlays(map,imagery?gibsTiles($('imageDate').value):null);
+  map.setProjection({type:state.mode==='globe'?'globe':'mercator'});
+  setBuildings(map,state.buildings);
+  setTerrain(map,state.terrain);
+  mapReady=true;mapMessage('');updateMap();setImagery();renderChrome();
+ });
+ map.on('error',e=>{if(!mapReady)mapMessage(tr('تعذر تحميل مصدر الخريطة؛ حاول التحديث.','Map source failed; try refreshing.'));else if(e.sourceId==='scientific')$('imageStatus').textContent=tr('بعض مربعات MODIS غير متاحة','Some MODIS tiles are unavailable');});
+ map.on('click',async e=>{
+  if(!mapReady||!validCoords(e.lngLat.lng,e.lngLat.lat))return;
+  const found=map.queryRenderedFeatures(e.point,{layers:['quakes','event-clusters']})[0];
+  if(found&&!state.measure){
+   if(found.properties.cluster){try{const zoom=await map.getSource('events').getClusterExpansionZoom(found.properties.cluster_id);map.easeTo({center:found.geometry.coordinates,zoom,duration:motion()});}catch{}return;}
+   const item=state.events.find(x=>x.id===found.properties.id);if(item){showEvent(item);return;}
+  }
+  selectPosition(e.lngLat.lng,e.lngLat.lat);
+ });
+ changeStyle('streets');
+}catch(e){mapMessage('WebGL unavailable / تعذر تشغيل الخرائط');}
 function visibleEvents(){return eventsAt(state.events,state.at).filter(e=>state.layers[e.category==='earthquake'?'earthquake':e.category==='wildfires'?'wildfires':'other']);}
 function updateMap(){if(!mapReady)return;map.getSource('events').setData({type:'FeatureCollection',features:visibleEvents().map(e=>({type:'Feature',geometry:{type:'Point',coordinates:[e.lon,e.lat]},properties:{id:e.id,color:colors[e.category]||colors.other}}))});map.getSource('selection').setData({type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'Point',coordinates:[state.position.lon,state.position.lat]},properties:{}}]});map.getSource('measure').setData({type:'FeatureCollection',features:state.points.length===2?[{type:'Feature',geometry:{type:'LineString',coordinates:state.points.map(p=>[p.lon,p.lat])},properties:{}}]:[]});}
 function selectPosition(lon,lat){if(!validCoords(lon,lat))return;state.position={lon,lat};if(state.measure){if(state.points.length===2)state.points=[];state.points.push({lon,lat});}updateMap();renderChrome();loadPosition();}
@@ -67,7 +102,7 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]')?.
 $('legend').addEventListener('change',e=>{if(e.target.dataset.layer){state.layers[e.target.dataset.layer]=e.target.checked;updateMap();render();}});
 $('lang').onclick=()=>{state.lang=state.lang==='ar'?'en':'ar';render();};$('theme').onclick=()=>document.documentElement.classList.toggle('light');
 $('globe').onclick=()=>{state.mode='globe';if(mapReady)map.setProjection({type:'globe'});renderChrome();};$('flat').onclick=()=>{state.mode='flat';if(mapReady)map.setProjection({type:'mercator'});renderChrome();};
-$('refresh').onclick=()=>{loadGlobal();loadPosition();};$('gps').onclick=()=>{if(!navigator.geolocation){alert(tr('GPS غير متاح','GPS unavailable'));return;}navigator.geolocation.getCurrentPosition(p=>{selectPosition(p.coords.longitude,p.coords.latitude);if(mapReady)map.flyTo({center:[p.coords.longitude,p.coords.latitude],zoom:5});},()=>alert(tr('لم يتم منح إذن الموقع أو تعذر تحديده','Location permission denied or unavailable')),{timeout:12000,enableHighAccuracy:false});};
+$('refresh').onclick=()=>{if(!mapReady||!$('maperror').hidden)changeStyle(state.base);loadGlobal();loadPosition();};$('gps').onclick=()=>{if(!navigator.geolocation){alert(tr('GPS غير متاح','GPS unavailable'));return;}navigator.geolocation.getCurrentPosition(p=>{selectPosition(p.coords.longitude,p.coords.latitude);if(mapReady)map.flyTo({center:[p.coords.longitude,p.coords.latitude],zoom:gpsZoom(p.coords.accuracy),duration:motion()});},()=>alert(tr('لم يتم منح إذن الموقع أو تعذر تحديده','Location permission denied or unavailable')),{timeout:12000,enableHighAccuracy:false});};
 $('measure').onclick=()=>{state.measure=!state.measure;state.points=[];updateMap();renderChrome();};
 function timeOffset(v){state.offset=Number(v);state.at=Date.now()+state.offset*3600000;updateMap();render();}
 $('time').oninput=e=>timeOffset(e.target.value);$('now').onclick=()=>{state.playing=false;timeOffset(0);};$('play').onclick=()=>{state.playing=!state.playing;renderChrome();};
