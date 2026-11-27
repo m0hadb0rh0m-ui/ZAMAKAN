@@ -5,7 +5,7 @@ import {approvedWeatherBase} from '../src/release-config.js';
 const base=approvedWeatherBase(process.env.VITE_BACKEND_URL);
 if(!base)throw Error('Missing owner HTTPS backend URL');
 const fail=label=>{throw Error(label+' access preflight failed (check owner setup and entitlement)')};
-const headers={Origin:'https://localhost','User-Agent':'Mozilla/5.0 ZAMAKAN-ULTRA/1.0'};
+const headers={Origin:'https://localhost',Referer:'https://localhost/','User-Agent':'Mozilla/5.0 ZAMAKAN-ULTRA/1.0'};
 let config;
 try{
  const r=await fetch(base+'/api/client-config',{headers,signal:AbortSignal.timeout(12000),redirect:'error'});
