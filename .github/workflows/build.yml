@@ -1,7 +1,7 @@
 name: ZAMAKAN build
 on:
   push:
-    branches: [main, feature/zamakan-ultra-map-ui]
+    branches: [main, feature/zamakan-ultra-map-ui, feature/zamakan-experience]
   workflow_dispatch:
 permissions:
   contents: read
