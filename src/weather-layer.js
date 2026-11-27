@@ -9,6 +9,7 @@ export const WEATHER_FIELDS={
 export function sampleGrid(bounds,n=3){
  // Sample at actual requested coordinates, not generated measurements.
  const east=bounds.getEast(),west=bounds.getWest(),south=Math.max(-80,bounds.getSouth()),north=Math.min(80,bounds.getNorth());
+ if(n<2||n>5||!Number.isInteger(n))throw Error('Invalid grid resolution');
  if(![east,west,south,north].every(Number.isFinite)||south>=north||east<=west||east-west>45||north-south>45)throw Error('Zoom in to a regional viewport');
  const pts=[];
  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
@@ -26,8 +27,8 @@ export function weatherFeatures(raw){
  });
 }
 export async function fetchWeatherGrid(points,signal,fetcher=globalThis.fetch){
- if(!points.length||points.length>9||points.some(p=>!validCoords(p.lon,p.lat)))throw Error('Invalid weather sample grid');
- const query=new URLSearchParams({latitude:points.map(p=>p.lat.toFixed(3)).join(','),longitude:points.map(p=>p.lon.toFixed(3)).join(','),current:Object.keys(WEATHER_FIELDS).join(','),timezone:'GMT'});
+ if(!points.length||points.length>25||points.some(p=>!validCoords(p.lon,p.lat)))throw Error('Invalid weather sample grid');
+ const query=new URLSearchParams({latitude:points.map(p=>p.lat.toFixed(3)).join(','),longitude:points.map(p=>p.lon.toFixed(3)).join(','),current:Object.keys(WEATHER_FIELDS).join(','),timezone:'GMT',cell_selection:'nearest'});
  const timeout=AbortSignal.timeout(18000);
  const res=await fetcher(SOURCES.weather.url+'?'+query,{signal:signal?AbortSignal.any([signal,timeout]):timeout,credentials:'omit'});
  if(!res.ok)throw Error('Weather grid HTTP '+res.status);
@@ -38,7 +39,7 @@ export function renderWeatherLayer(map,data,field){
  if(map.getLayer('z-weather-grid'))map.removeLayer('z-weather-grid');
  if(map.getLayer('z-weather-labels'))map.removeLayer('z-weather-labels');
  if(!data||!WEATHER_FIELDS[field]){if(map.getSource('z-weather'))map.removeSource('z-weather');return;}
- if(!map.getSource('z-weather'))map.addSource('z-weather',{type:'geojson',data});
+ if(!map.getSource('z-weather'))map.addSource('z-weather',{type:'geojson',data,attribution:'Open-Meteo · regional interpolation'});
  else map.getSource('z-weather').setData(data);
  const conf=WEATHER_FIELDS[field];
  map.addLayer({id:'z-weather-grid',type:'circle',source:'z-weather',filter:['has',field],paint:{'circle-radius':23,'circle-color':['interpolate',['linear'],['get',field],...conf.stops.flat()],'circle-stroke-color':'#fff','circle-stroke-width':2,'circle-opacity':0.9}});

@@ -1,5 +1,7 @@
 // MapLibre style adapter. No third-party credentials or map tiles are persisted.
-export const MAPTILER_KEY = (import.meta.env?.VITE_MAPTILER_PUBLIC_KEY || '').trim();
+import {mapTilerKey} from './provider-config.js';
+export let MAPTILER_KEY = mapTilerKey();
+export const refreshMapTilerKey=()=>{MAPTILER_KEY=mapTilerKey();};
 export const OPEN_STYLES = {
  streets:'https://tiles.openfreemap.org/styles/liberty',
  light:'https://tiles.openfreemap.org/styles/positron',

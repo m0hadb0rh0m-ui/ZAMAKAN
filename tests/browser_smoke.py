@@ -17,8 +17,9 @@ with sync_playwright() as p:
  b=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH'),headless=True,args=args)
  context=b.new_context(viewport={'width':1440,'height':900},geolocation={'latitude':31.346,'longitude':34.303,'accuracy':18},permissions=['geolocation'],ignore_https_errors=bool(os.environ.get('ZAMAKAN_PROXY')))
  page=context.new_page()
- errors=[]; tiles=[]
+ errors=[]; tiles=[]; console_errors=[]
  page.on('pageerror',lambda e:errors.append(str(e)))
+ page.on('console', lambda m:console_errors.append(m.text) if m.type=='error' else None)
  page.on('response',lambda r:tiles.append(r.url) if 'tiles.openfreemap.org' in r.url and r.ok else None)
  page.goto(BASE,wait_until='domcontentloaded',timeout=30000)
  page.wait_for_selector('#map canvas',timeout=20000)
@@ -61,10 +62,12 @@ with sync_playwright() as p:
  page.locator('#weatherGrid').click()
  wait_until(lambda: 'وقت النموذج' in page.locator('#weatherLayerStatus').inner_text() or 'تعذر' in page.locator('#weatherLayerStatus').inner_text(),30)
  print('Weather grid:',page.locator('#weatherLayerStatus').inner_text(),flush=True)
- assert 'وقت النموذج' in page.locator('#weatherLayerStatus').inner_text(),'Weather grid failed'
+ assert 'سطح إقليمي' in page.locator('#weatherLayerStatus').inner_text(),'Continuous surface failed'
+ assert page.locator('#weatherScale').is_visible()
  page.locator('#layersClose').click()
  page.wait_for_timeout(1800)
  page.screenshot(path=OUT/'weather-grid.png')
+ print('Console errors:',console_errors[-15:],flush=True)
  page.locator('#layersToggle').click()
  page.locator('#weatherClear').click()
  page.locator('#layersClose').click()
@@ -72,6 +75,14 @@ with sync_playwright() as p:
  assert 'الطقس' in page.locator('#panel').inner_text()
  page.screenshot(path=OUT/'science.png')
  page.locator('#settings').click()
+ page.screenshot(path=OUT/'provider-settings.png')
+ page.locator('#mapKey').fill('bad')
+ page.locator('#activateMapKey').click()
+ assert 'غير صالح' in page.locator('#keyStatus').inner_text()
+ page.locator('#openRealistic').click()
+ assert 'رمز' in page.locator('#ionStatus').inner_text()
+ page.locator('#lowPower').check()
+ page.locator('#lowPower').uncheck()
  page.locator('#lang').click()
  assert page.locator('html').get_attribute('dir')=='ltr'
  page.locator('#settingsClose').click()

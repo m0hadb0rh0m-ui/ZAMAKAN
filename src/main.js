@@ -4,14 +4,18 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 maplibregl.setWorkerUrl(new URL(workerUrl, location.href).href);
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './style.css';
+import {authorizeMapTiler,clearMapTiler,ionToken} from './provider-config.js';
+import {lookupHeight} from './building-height.js';
+import {renderSurface,surfaceSamples} from './weather-surface.js';
 import {WEATHER_FIELDS,sampleGrid,fetchWeatherGrid,renderWeatherLayer} from './weather-layer.js';
 import {searchPlaces,coordinateQuery} from './search.js';
 import {icon} from './icons.js';
-import {MODES,isCommercialMode,MAPTILER_KEY,fetchStyle,restoreOverlays,addScientific,setBuildings,setTerrain,zoomFor,gpsZoom,motion} from './map-engine.js';
+import {MODES,isCommercialMode,MAPTILER_KEY,refreshMapTilerKey,fetchStyle,restoreOverlays,addScientific,setBuildings,setTerrain,zoomFor,gpsZoom,motion} from './map-engine.js';
 import {SOURCES,fetchSource,weatherParams,eventsAt,nearestHour,distance,validCoords,iso,gibsTiles} from './data.js';
 
 const $=id=>document.getElementById(id);
 const state={lang:'ar',mode:'flat',base:'streets',buildings:false,terrain:false,tab:'earth',position:{lon:34.31,lat:31.35},results:{},events:[],layers:{earthquake:true,wildfires:true,other:true},at:Date.now(),offset:0,playing:false,measure:false,points:[],request:0};
+let lowPower=Boolean(navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=4)||Boolean(matchMedia('(prefers-reduced-motion: reduce)').matches);
 const tr=(ar,en)=>state.lang==='ar'?ar:en;
 const tabs=[['earth','◉','الأرض','Earth'],['weather','☁','الطقس','Weather'],['disasters','⚠','الكوارث','Disasters'],['space','✦','الفضاء','Space'],['air','◈','البيئة','Environment'],['marine','≈','المحيطات','Oceans'],['sources','▤','المصادر','Sources'],['analysis','∿','التحليل','Analysis']];
 const colors={earthquake:'#ffb15e',wildfires:'#ff617a',other:'#67d5f4'};
@@ -40,9 +44,13 @@ $('app').innerHTML=`<main class="map-shell">
  </div>
  <div class="map-status"><span class="live-dot"></span><span id="maptitle"></span><span id="zoomLevel" dir="ltr"></span></div>
  <div id="mapNotice" role="status" hidden></div>
- <section id="layersPanel" class="floating-panel" hidden><div class="panel-heading"><div><small class="eyebrow">MAP ENGINE</small><h2 id="layerTitle"></h2></div>${btn('layersClose','close','Close layers')}</div><div id="baseStyles" class="style-grid"></div><h3 id="overlayTitle"></h3><div class="legend" id="legend"></div><div class="layer-row"><button id="imagery" type="button"></button><input type="date" id="imageDate" aria-label="Scientific imagery date"></div><small id="imageStatus" aria-live="polite"></small><label class="dem-row"><input type="checkbox" id="terrain"><span id="terrainLabel"></span></label><p id="layerHelp" class="muted"></p><h3 id="weatherLayerTitle"></h3><label class="field"><select id="weatherField" aria-label="Weather field"></select></label><button id="weatherGrid" type="button"></button><button id="weatherClear" type="button"></button><small id="weatherLayerStatus" class="muted" aria-live="polite"></small></section>
- <section id="settingsPanel" class="floating-panel" hidden><div class="panel-heading"><h2 id="settingsTitle"></h2>${btn('settingsClose','close','Close settings')}</div><div class="settings-list"><button id="lang">EN</button><button id="theme">${icon('theme')}</button><button id="refresh">${icon('refresh')}</button><span id="utc" dir="ltr"></span></div><p id="settingsHint" class="muted"></p><div id="footer"></div></section>
+ <section id="layersPanel" class="floating-panel" hidden><div class="panel-heading"><div><small class="eyebrow">MAP ENGINE</small><h2 id="layerTitle"></h2></div>${btn('layersClose','close','Close layers')}</div><div id="baseStyles" class="style-grid"></div><h3 id="overlayTitle"></h3><div class="legend" id="legend"></div><div class="layer-row"><button id="imagery" type="button"></button><input type="date" id="imageDate" aria-label="Scientific imagery date"></div><small id="imageStatus" aria-live="polite"></small><label class="dem-row"><input type="checkbox" id="terrain"><span id="terrainLabel"></span></label><p id="layerHelp" class="muted"></p><h3 id="weatherLayerTitle"></h3><label class="field"><select id="weatherField" aria-label="Weather field"></select></label><button id="weatherGrid" type="button"></button><button id="weatherClear" type="button"></button><label class="dem-row"><input type="checkbox" id="weatherSurface" checked><span id="surfaceLabel"></span></label><div id="weatherScale" class="weather-scale"></div><small id="weatherLayerStatus" class="muted" aria-live="polite"></small></section>
+ <section id="settingsPanel" class="floating-panel" hidden><div class="panel-heading"><h2 id="settingsTitle"></h2>${btn('settingsClose','close','Close settings')}</div><div class="settings-list"><button id="lang">EN</button><button id="theme">${icon('theme')}</button><button id="refresh">${icon('refresh')}</button><span id="utc" dir="ltr"></span></div><p id="settingsHint" class="muted"></p>
+ <section class="provider-card"><h3 id="providerTitle"></h3><label id="mapKeyLabel" for="mapKey"></label><input id="mapKey" type="password" autocomplete="off" spellcheck="false" maxlength="160"><div class="row"><button id="activateMapKey"></button><button id="clearMapKey"></button></div><a id="mapKeyLink" href="https://cloud.maptiler.com/" target="_blank" rel="noopener noreferrer"></a><small id="keyStatus" role="status"></small>
+ <hr><label id="ionLabel" for="ionToken"></label><input id="ionToken" type="password" autocomplete="off" spellcheck="false" maxlength="4096"><button id="openRealistic"></button><a id="ionLink" href="https://ion.cesium.com/" target="_blank" rel="noopener noreferrer"></a><small id="ionStatus" role="status"></small></section>
+ <label class="dem-row"><input type="checkbox" id="lowPower"><span id="lowPowerLabel"></span></label><div id="footer"></div></section>
  <section class="selection-chip" id="coord" aria-live="polite"></section>
+ <section id="realityPanel" hidden aria-label="Photorealistic 3D viewer"><div id="realityCanvas"></div><div class="reality-toolbar"><button id="closeReality"></button><span id="realityStatus" role="status"></span></div></section>
  <div id="sheet" class="sheet" hidden><button id="sheetHandle" class="sheet-handle" aria-label="Resize information sheet" type="button"><span></span></button><div class="panel-heading"><div><small class="eyebrow">ZAMAKAN INTELLIGENCE</small><h2 id="sheetTitle"></h2></div>${btn('sheetClose','close','Close information')}</div><nav id="nav" aria-label="Science modules"></nav><div class="timeline"><div class="row"><span id="timelabel"></span><strong id="timelineDate"></strong><button id="play">▶</button><button id="now"></button></div><input id="time" type="range" min="-24" max="48" value="0" step="1" aria-label="UTC time offset"><div class="range"><span>−24h</span><span>UTC 0</span><span>+48h</span></div></div><aside id="panel" aria-live="polite"></aside></div>
  <nav class="bottom-nav" aria-label="Main navigation"><button id="explore">${icon('map')}<span></span></button><button data-tab="weather">${icon('weather')}<span></span></button><button data-tab="disasters">${icon('disasters')}<span></span></button><button data-tab="earth">${icon('earth')}<span></span></button></nav>
  </main>`;
@@ -58,23 +66,57 @@ $('sheetHandle').onclick=()=>{if(!draggedSheet)$('sheet').classList.toggle('expa
 let sheetStart=null,draggedSheet=false;
 $('sheetHandle').onpointerdown=e=>{draggedSheet=false;sheetStart=e.clientY;e.currentTarget.setPointerCapture(e.pointerId);};
 $('sheetHandle').onpointerup=e=>{if(sheetStart!==null&&Math.abs(e.clientY-sheetStart)>35){$('sheet').classList.toggle('expanded',e.clientY<sheetStart);draggedSheet=true;e.preventDefault();}sheetStart=null;};
-$('baseStyles').onclick=e=>{const mode=e.target.closest('[data-mode]')?.dataset.mode;if(!mode)return;if(isCommercialMode(mode)&&!MAPTILER_KEY){notice(tr('يتطلب هذا النمط مفتاح MapTiler مُعتمدًا. راجع الإعدادات.','This style requires an approved MapTiler key. See settings.'));return;}notice('');changeStyle(mode);};
-let weatherGridData=null,weatherGridAbort,weatherField='temperature_2m',weatherGridState='';
-function syncWeatherGrid(){if(mapReady)renderWeatherLayer(map,weatherGridData,weatherField);}
+$('baseStyles').onclick=e=>{const mode=e.target.closest('[data-mode]')?.dataset.mode;if(!mode)return;if(isCommercialMode(mode)&&!MAPTILER_KEY){notice(tr('يتطلب هذا النمط مفتاح MapTiler مُعتمدًا.','This style requires an approved MapTiler key.'));togglePanel('settingsPanel');$('mapKey').focus();return;}notice('');changeStyle(mode);};
+let weatherGridData=null,weatherGridAbort,weatherField='temperature_2m',weatherGridState='',surfaceEnabled=true;
+function syncWeatherGrid(){
+ if(!mapReady)return;
+ const continuous=renderSurface(map,weatherGridData,weatherField,surfaceEnabled);
+ renderWeatherLayer(map,weatherGridData,weatherField);
+ if(weatherGridData){const time=(continuous?surfaceSamples(weatherGridData,weatherField)?.time:null)||weatherGridData.features[0]?.properties.time;$('weatherLayerStatus').textContent=(continuous?tr('سطح إقليمي مستوفى حسابيًا داخل العينات فقط (ليس رادارًا أو قياسات ميدانية). وقت النموذج: ','Regional interpolation within sample coverage (not radar or observations). Model time: '):tr('عينات نموذجية نقطية. وقت النموذج: ','Discrete model samples. Model time: '))+date(time);}
+ $('weatherScale').innerHTML=WEATHER_FIELDS[weatherField].stops.map(([v,c])=>'<span><i style="background:'+c+'"></i>'+v+' '+WEATHER_FIELDS[weatherField].unit+'</span>').join('');
+}
 $('weatherField').onchange=e=>{weatherField=e.target.value;syncWeatherGrid();};
+$('weatherSurface').onchange=e=>{surfaceEnabled=e.target.checked;syncWeatherGrid();};
 $('weatherClear').onclick=()=>{weatherGridAbort?.abort();weatherGridData=null;syncWeatherGrid();$('weatherLayerStatus').textContent='';};
 $('weatherGrid').onclick=async()=>{
  if(!mapReady)return;
- weatherGridAbort?.abort();const controller=new AbortController();weatherGridAbort=controller;
+ weatherGridAbort?.abort();const controller=new AbortController();weatherGridAbort=controller;$('weatherGrid').disabled=true;
  $('weatherLayerStatus').textContent=tr('جارٍ طلب عينات النموذج…','Fetching model samples…');
  try{
-  // A model grid has much coarser resolution than a building map. Zoom out before sampling.
-  if(map.getZoom()>9)map.jumpTo({zoom:9,pitch:0});
-  const pts=sampleGrid(map.getBounds());const geo=await fetchWeatherGrid(pts,controller.signal);
+  if(map.getZoom()>8)map.jumpTo({zoom:8,pitch:0});
+  const pts=sampleGrid(map.getBounds(),surfaceEnabled?5:3);const geo=await fetchWeatherGrid(pts,controller.signal);
   if(controller.signal.aborted)return;
-  weatherGridData=geo;syncWeatherGrid();$('weatherLayerStatus').textContent=geo.features.length?tr('عينات نموذجية نقطية، وليست قياسات ميدانية أو خريطة مستمرة. وقت النموذج: ','Discrete model samples, not observations or a continuous map. Model time: ')+date(geo.features[0].properties.time):tr('لا توجد بيانات','No data');
- }catch(e){if(!controller.signal.aborted)$('weatherLayerStatus').textContent=tr('تعذر تحميل العينات. اختر نطاقًا إقليميًا ثم أعد المحاولة.','Samples unavailable. Choose a regional view and retry.');}
+  weatherGridData=geo.features.length?geo:null;syncWeatherGrid();if(!weatherGridData)$('weatherLayerStatus').textContent=tr('لا توجد بيانات','No data');
+ }catch(e){if(!controller.signal.aborted)console.warn('Weather layer unavailable:',e?.message);if(!controller.signal.aborted)$('weatherLayerStatus').textContent=tr('تعذر تحميل العينات. اختر نطاقًا إقليميًا ثم أعد المحاولة.','Samples unavailable. Choose a regional view and retry.');}
+ finally{if(weatherGridAbort===controller)$('weatherGrid').disabled=false;}
 };
+let providerAbort,realityAbort,realityDestroy;
+$('activateMapKey').onclick=async()=>{
+ providerAbort?.abort();const ctl=new AbortController();providerAbort=ctl;$('activateMapKey').disabled=true;
+ $('keyStatus').textContent=tr('جارٍ التحقق من صلاحية مفتاح الصور…','Validating satellite access…');
+ try{await authorizeMapTiler($('mapKey').value,{signal:ctl.signal});if(ctl.signal.aborted)return;refreshMapTilerKey();$('mapKey').value='';$('keyStatus').textContent=tr('تم قبول المفتاح من مزود الصور.','Satellite provider accepted key.');renderChrome();changeStyle('satellite');}
+ catch{if(!ctl.signal.aborted)$('keyStatus').textContent=tr('المفتاح غير صالح أو لا توجد صلاحية للصور.','Invalid key or imagery entitlement unavailable.');}
+ finally{if(providerAbort===ctl)$('activateMapKey').disabled=false;}
+};
+$('clearMapKey').onclick=()=>{providerAbort?.abort();$('activateMapKey').disabled=false;clearMapTiler();refreshMapTilerKey();$('mapKey').value='';state.terrain=false;$('keyStatus').textContent=tr('أزيل المفتاح من الجلسة.','Key removed from session.');if(isCommercialMode(state.base))changeStyle('streets');else if(mapReady)setTerrain(map,false);renderChrome();};
+$('lowPower').onchange=e=>{lowPower=e.target.checked;if(map)map.setPixelRatio(Math.min(devicePixelRatio||1,lowPower?1:1.75));};
+function closeReality(){
+ realityAbort?.abort();realityDestroy?.();realityDestroy=null;$('realityPanel').hidden=true;$('openRealistic').disabled=false;$('ionToken').value='';$('realityCanvas').textContent='';$('map').style.visibility='';map?.resize();
+}
+$('closeReality').onclick=closeReality;
+$('openRealistic').onclick=async()=>{
+ let token;
+ try{token=ionToken($('ionToken').value);}catch{$('ionStatus').textContent=tr('أدخل رمز Cesium ion للعميل المصرح له.','Enter an authorized Cesium ion client token.');return;}
+ realityAbort?.abort();const ctl=new AbortController();realityAbort=ctl;$('openRealistic').disabled=true;$('ionToken').value='';
+ $('realityPanel').hidden=false;$('map').style.visibility='hidden';map?.stop();
+ $('realityStatus').textContent=tr('تحميل المجسمات من المزود المرخص…','Loading licensed photorealistic tiles…');
+ try{
+  const {openRealistic3D}=await import('./realistic-3d.js');
+  if(ctl.signal.aborted)return;
+  realityDestroy=await openRealistic3D($('realityCanvas'),{token,lon:state.position.lon,lat:state.position.lat,signal:ctl.signal,lowPower,onStatus:s=>{if(!ctl.signal.aborted)$('realityStatus').textContent=s==='visible'?tr('مجسمات Google عبر Cesium ion؛ التغطية حسب المزود.','Google photorealistic tiles via Cesium ion; coverage varies.'):tr('بعض المجسمات لم تُحمّل أو تعذر الرسم.','Some tiles or rendering are unavailable.');}});
+ }catch{if(!ctl.signal.aborted){closeReality();$('ionStatus').textContent=tr('تعذر تحميل المجسمات؛ تحقق من الرمز والترخيص والتغطية.','3D unavailable; verify token, entitlement and coverage.');}}
+};
+document.addEventListener('visibilitychange',()=>{if(document.hidden){map?.stop();if(!$('realityPanel').hidden)closeReality();}});
 $('terrain').onchange=()=>{state.terrain=$('terrain').checked;if(mapReady)setTerrain(map,state.terrain);};
 $('compass').onclick=()=>map?.easeTo({bearing:0,pitch:0,duration:motion()});
 $('zoomIn').onclick=()=>map?.zoomIn({duration:motion()});$('zoomOut').onclick=()=>map?.zoomOut({duration:motion()});
@@ -105,7 +147,26 @@ async function reverseSelected(){
  notice(tr('جارٍ البحث عن العنوان…','Looking up address…'));
  try{const [x]=await searchPlaces('',{language:state.lang,position:pos,reverse:true,signal:reverseAbort.signal});if(state.position!==pos)return;state.place=x||null;renderChrome();notice(x?'':tr('لا يوجد عنوان مسجل لهذه النقطة','No mapped address at this point'));}catch{if(state.position===pos)notice(tr('تعذر استرجاع العنوان','Address lookup unavailable'));}
 }
-$('coord').addEventListener('click',e=>{if(e.target.closest('#reverse'))reverseSelected();});
+let heightAbort;
+async function inspectHeight(){
+ const selected=state.place,pos=state.position;if(selected?.type!=='building')return;
+ heightAbort?.abort();const ctl=new AbortController();heightAbort=ctl;selected.heightState='loading';renderChrome();
+ try{const result=await lookupHeight(pos.lon,pos.lat,selected.renderHeight,{signal:ctl.signal});if(state.place!==selected||ctl.signal.aborted)return;selected.height=result;selected.heightState='done';}
+ catch{if(ctl.signal.aborted||state.place!==selected)return;selected.heightState='failed';}
+ renderChrome();
+}
+function heightCard(place){
+ if(place?.type!=='building')return '';
+ const h=place.height;let detail='';
+ if(place.heightState==='loading')detail=tr('جارٍ التحقق…','Checking building source…');
+ else if(place.heightState==='failed')detail=tr('تعذر الوصول إلى المصدر؛ الارتفاع غير موثّق.','Source unavailable; height remains unverified.');
+ else if(h){
+  const labels={recorded:tr('ارتفاع مسجل في OSM (ليس قياسًا مستقلاً)','Height recorded in OSM (not independently surveyed)'), 'estimated-levels':tr('تقدير من الطوابق × ٣ م','Estimated from levels × 3 m'),'render-only':tr('ارتفاع رسم غير موثّق','Unverified render height'),unknown:tr('لا يوجد ارتفاع مسجل','No recorded height'),ambiguous:tr('لم تُحدَّد مطابقة فريدة للمبنى','No unique building match')};
+  detail=labels[h.kind]+(h.meters!=null?' · '+fmt(h.meters,'m'):'')+(h.source?' · '+h.source:'')+(h.edited?' · '+tr('آخر تعديل للسجل: ','Record last edited: ')+date(h.edited):'');
+ }
+ return '<div class="height-info">'+(detail?'<small class="height-detail">'+safe(detail)+'</small>':'')+(h?.sourceRecords?link(h.sourceRecords,tr('سجل المبنى في OpenStreetMap','OpenStreetMap building record')):'')+'<button id="inspectHeight" '+(place.heightState==='loading'?'disabled':'')+'>'+tr('تحقق من مصدر الارتفاع','Check height provenance')+'</button></div>';
+}
+$('coord').addEventListener('click',e=>{if(e.target.closest('#reverse'))reverseSelected();if(e.target.closest('#inspectHeight'))inspectHeight();});
 function setImagery(){
  if(!mapReady)return;
  try{addScientific(map,imagery?gibsTiles($('imageDate').value):null);$('imageStatus').textContent=imagery?tr('رصد علمي MODIS — تاريخ الطلب ','MODIS scientific observation — requested date ')+$('imageDate').value:'';$('imagery').classList.toggle('active',imagery);}catch{$('imageStatus').textContent=tr('الصور غير متاحة','Imagery unavailable');}
@@ -131,7 +192,7 @@ async function changeStyle(mode){
  }finally{clearTimeout(timer);}
 }
 try{
- map=new maplibregl.Map({container:'map',style:{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#dce7ed'}}]},center:[34.31,31.35],zoom:12.5,maxZoom:20,maxPitch:75,attributionControl:{compact:true},maxTileCacheSize:160});
+ map=new maplibregl.Map({container:'map',style:{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#dce7ed'}}]},center:[34.31,31.35],zoom:12.5,maxZoom:20,maxPitch:75,attributionControl:{compact:true},maxTileCacheSize:lowPower?64:128,pixelRatio:Math.min(devicePixelRatio||1,lowPower?1:1.75),fadeDuration:lowPower?80:250});
  map.addControl(new maplibregl.ScaleControl({maxWidth:100}),'bottom-left');
  map.on('move',()=>{$('zoomLevel').textContent='Z '+map.getZoom().toFixed(1);$('compass').style.setProperty('--bearing',-map.getBearing()+'deg');});
  map.on('style.load',()=>{
@@ -152,7 +213,7 @@ try{
   }
   const baseFeature=!state.measure?map.queryRenderedFeatures(e.point).find(f=>['poi','transportation_name','place','housenumber','building'].includes(f.sourceLayer)&&(f.properties?.name||f.properties?.name_en||f.properties?.housenumber||f.sourceLayer==='building')):null;
   const p=baseFeature?.properties;
-  const place=p?{name:p.name||p.name_en||p.housenumber||tr('مبنى مسجّل','Mapped building'),admin:baseFeature.sourceLayer==='building'&&Number.isFinite(p.render_height)?tr('ارتفاع الرسم (غير موثّق): ','Rendered height (unverified): ')+p.render_height+' m':String(p.class||''),source:'OpenMapTiles / OpenStreetMap',type:baseFeature.sourceLayer==='building'?'building':'poi'}:null;
+  const place=p?{name:p.name||p.name_en||p.housenumber||tr('مبنى مسجّل','Mapped building'),admin:baseFeature.sourceLayer==='building'&&Number.isFinite(p.render_height)?tr('ارتفاع الرسم (غير موثّق): ','Rendered height (unverified): ')+p.render_height+' m':String(p.class||''),source:'OpenMapTiles / OpenStreetMap',type:baseFeature.sourceLayer==='building'?'building':'poi',renderHeight:baseFeature.sourceLayer==='building'&&Number.isFinite(p.render_height)?p.render_height:null}:null;
   selectPosition(e.lngLat.lng,e.lngLat.lat,place);
  });
  changeStyle('streets');
@@ -160,7 +221,7 @@ try{
 function visibleEvents(){return eventsAt(state.events,state.at).filter(e=>state.layers[e.category==='earthquake'?'earthquake':e.category==='wildfires'?'wildfires':'other']);}
 function updateMap(){if(!mapReady)return;map.getSource('events').setData({type:'FeatureCollection',features:visibleEvents().map(e=>({type:'Feature',geometry:{type:'Point',coordinates:[e.lon,e.lat]},properties:{id:e.id,color:colors[e.category]||colors.other}}))});map.getSource('selection').setData({type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'Point',coordinates:[state.position.lon,state.position.lat]},properties:{}}]});map.getSource('measure').setData({type:'FeatureCollection',features:state.points.length===2?[{type:'Feature',geometry:{type:'LineString',coordinates:state.points.map(p=>[p.lon,p.lat])},properties:{}}]:[]});}
 let positionTimer;
-function selectPosition(lon,lat,place=null){if(!validCoords(lon,lat))return;reverseAbort?.abort();state.position={lon,lat};state.place=place;if(state.measure){if(state.points.length===2)state.points=[];state.points.push({lon,lat});}updateMap();renderChrome();if(!state.measure){clearTimeout(positionTimer);positionTimer=setTimeout(loadPosition,300);}}
+function selectPosition(lon,lat,place=null){heightAbort?.abort();if(!validCoords(lon,lat))return;reverseAbort?.abort();state.position={lon,lat};state.place=place;if(state.measure){if(state.points.length===2)state.points=[];state.points.push({lon,lat});}updateMap();renderChrome();if(!state.measure){clearTimeout(positionTimer);positionTimer=setTimeout(loadPosition,300);}}
 function showEvent(e){sheetOpen();state.tab='disasters';state.selected=e;selectPosition(e.lon,e.lat);if(mapReady)map.flyTo({center:[e.lon,e.lat],zoom:4,duration:700});render();}
 function renderChrome(){
  document.documentElement.lang=state.lang;$('searchinput').placeholder=tr('ابحث عن مكان أو عنوان…','Search places or addresses…');document.documentElement.dir=state.lang==='ar'?'rtl':'ltr';$('lang').textContent=state.lang==='ar'?'EN':'ع';
@@ -170,10 +231,11 @@ function renderChrome(){
  $('baseStyles').innerHTML=MODES.map(m=>'<button data-mode="'+m+'" class="style-choice '+(m===state.base?'active':'')+'" aria-pressed="'+(m===state.base)+'"><span class="map-swatch '+m+'"></span><b>'+tr(...modeLabels[m])+'</b>'+(isCommercialMode(m)&&!MAPTILER_KEY?'<small>'+tr('يتطلب مفتاحًا','Key required')+'</small>':'')+'</button>').join('');
  const weatherLabels={temperature_2m:['الحرارة','Temperature'],cloud_cover:['السحب','Cloud cover'],precipitation:['الأمطار','Precipitation'],wind_speed_10m:['سرعة الرياح','Wind speed'],surface_pressure:['الضغط','Pressure']};
  $('weatherField').innerHTML=Object.keys(WEATHER_FIELDS).map(k=>'<option value="'+k+'">'+tr(...weatherLabels[k])+'</option>').join('');$('weatherField').value=weatherField;
- $('weatherLayerTitle').textContent=tr('عينات الطقس على الخريطة','Weather map samples');$('weatherGrid').textContent=tr('تحميل المنطقة الظاهرة','Load visible region');$('weatherClear').textContent=tr('إزالة العينات','Clear samples');
+ $('weatherLayerTitle').textContent=tr('خرائط الطقس الإقليمية','Regional weather maps');$('surfaceLabel').textContent=tr('سطح مستمر مستوفى حسابيًا','Interpolated continuous surface');$('weatherSurface').checked=surfaceEnabled;$('weatherGrid').textContent=tr('تحميل المنطقة الظاهرة','Load visible region');$('weatherClear').textContent=tr('إزالة العينات','Clear samples');
  $('layerTitle').textContent=tr('أنماط الخريطة','Map styles');$('overlayTitle').textContent=tr('طبقات الرصد','Observation layers');
  $('imagery').textContent=tr('رصد NASA MODIS','NASA MODIS observation');$('terrainLabel').textContent=tr('ارتفاعات التضاريس DEM','DEM elevation');$('terrain').disabled=!MAPTILER_KEY;$('terrain').checked=state.terrain;
  $('layerHelp').textContent=(['satellite','hybrid'].includes(state.base)?tr('تاريخ التقاط الصور غير متاح من النمط؛ قد تختلف الدقة والحداثة حسب المنطقة. ','Acquisition date not supplied by this style; imagery detail and age vary by area. '):'')+tr('ارتفاعات المباني من OpenMapTiles قد تكون محسوبة أو تقديرية؛ لا يمكن تأكيدها من هذا المصدر.','OpenMapTiles building heights may be derived or estimated; provenance is not supplied.')+(MAPTILER_KEY?'':tr(' الصور التجارية والتضاريس تتطلب مفتاحًا.',' Imagery and DEM require an approved key.'));
+ $('providerTitle').textContent=tr('مزودو الخرائط المرخصون','Licensed map providers');$('mapKeyLabel').textContent=tr('مفتاح MapTiler العام للعميل (لا يُحفظ)','Public MapTiler client key (not stored)');$('mapKeyLink').textContent=tr('الحصول على مفتاح MapTiler','Get a MapTiler key');$('activateMapKey').textContent=tr('تحقق وفعّل صور HD','Validate & enable HD');$('clearMapKey').textContent=tr('إزالة المفتاح','Remove key');$('ionLabel').textContent=tr('رمز Cesium ion للعميل المصرح للعرض الواقعي','Cesium ion client token with photorealistic entitlement');$('ionLink').textContent=tr('إعداد ترخيص Cesium ion','Configure Cesium ion');$('openRealistic').textContent=tr('عرض 3D الواقعي','Open photorealistic 3D');$('closeReality').textContent=tr('العودة للخريطة','Back to map');$('lowPowerLabel').textContent=tr('وضع توفير الطاقة (دقة رسم أقل)','Power saver (lower render resolution)');$('lowPower').checked=lowPower;
  $('settingsTitle').textContent=tr('الإعدادات','Settings');$('settingsHint').textContent=tr('البحث يستخدم Photon/OSM (خدمة عامة محدودة) أو MapTiler؛ وقد يرسل الطقس الإحداثيات إلى المزود. إعداد MapTiler موثّق في المستودع.','Search uses Photon/OSM (limited public instance) or MapTiler; weather may send coordinates to providers. MapTiler setup is documented in the repository.');
  $('theme').innerHTML=icon('theme')+tr('المظهر','Appearance');$('refresh').innerHTML=icon('refresh')+tr('تحديث البيانات والخريطة','Refresh data and map');
  $('sheetTitle').textContent=tr('المرصد العلمي','Science observatory');
@@ -181,7 +243,7 @@ function renderChrome(){
  $('buildings').classList.toggle('active',state.buildings);
  $('flat').setAttribute('aria-pressed',!state.buildings&&state.mode==='flat');
  $('globe').classList.toggle('active',state.mode==='globe');$('flat').classList.toggle('active',state.mode==='flat'&&!state.buildings);$('measure').classList.toggle('active',state.measure);
- $('coord').innerHTML='<b>'+tr('النقطة المحددة','Selected location')+'</b>'+(state.place?'<strong>'+safe(state.place.name)+'</strong><small>'+safe([state.place.admin,state.place.country,state.place.source].filter(Boolean).join(' · '))+'</small>':'')+'<div dir="ltr">'+state.position.lat.toFixed(4)+'°, '+state.position.lon.toFixed(4)+'°</div>'+(state.measure?'<small>'+ (state.points.length===2?fmt(distance(...state.points),'km'):tr('حدد نقطتين للقياس','Select two points'))+'</small>':(!state.place?'<button id="reverse">'+tr('استرجاع العنوان','Find address')+'</button>':''));
+ $('coord').innerHTML='<b>'+tr('النقطة المحددة','Selected location')+'</b>'+(state.place?'<strong>'+safe(state.place.name)+'</strong><small>'+safe([state.place.admin,state.place.country,state.place.source].filter(Boolean).join(' · '))+'</small>':'')+'<div dir="ltr">'+state.position.lat.toFixed(4)+'°, '+state.position.lon.toFixed(4)+'°</div>'+(state.measure?'<small>'+ (state.points.length===2?fmt(distance(...state.points),'km'):tr('حدد نقطتين للقياس','Select two points'))+'</small>':(!state.place?'<button id="reverse">'+tr('استرجاع العنوان','Find address')+'</button>':''))+heightCard(state.place);
 
  $('legend').innerHTML=Object.entries(colors).map(([k,c])=>'<label><input type="checkbox" data-layer="'+k+'" '+(state.layers[k]?'checked':'')+'><i style="background:'+c+'"></i>'+tr({earthquake:'زلازل',wildfires:'حرائق',other:'أحداث أخرى'}[k],{earthquake:'Earthquakes',wildfires:'Wildfires',other:'Other events'}[k])+'</label>').join('');
  $('timelabel').textContent=tr('الزمان / UTC','Timeline / UTC');$('now').textContent=tr('الآن','Now');$('timelineDate').textContent=date(state.at);$('play').textContent=state.playing?'Ⅱ':'▶';$('time').value=state.offset;

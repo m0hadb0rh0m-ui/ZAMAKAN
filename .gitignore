@@ -7,3 +7,4 @@ android/
 
 .env.*
 !.env.example
+android-benchmark-results/

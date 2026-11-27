@@ -10,3 +10,5 @@ Captured with live OpenFreeMap, Photon and Open-Meteo responses in Chromium at 1
 - [Geographic search](search.jpg)
 - [Scientific weather panel](science.jpg)
 - [Regional numerical weather sample overlay](weather-grid.jpg)
+- [Continuous regional weather surface (live model values)](continuous-weather.jpg)
+- [Licensed provider configuration (no key entered)](provider-settings.jpg)

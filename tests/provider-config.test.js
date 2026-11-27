@@ -1,0 +1,6 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {authorizeMapTiler,clearMapTiler,mapTilerKey,ionToken} from '../src/provider-config.js';
+test('authorization requires valid satellite style and successful provider response',async()=>{clearMapTiler();await assert.rejects(authorizeMapTiler('invalid!'));await assert.rejects(authorizeMapTiler('fake-test-key',{fetcher:async()=>({ok:false})}));assert.equal(mapTilerKey(),'');await authorizeMapTiler('fake-test-key',{fetcher:async u=>({ok:true,json:async()=>({version:8,sources:{sat:{type:'raster'}},layers:[]})})});assert.equal(mapTilerKey(),'fake-test-key');clearMapTiler();assert.equal(mapTilerKey(),'');});
+test('reject account password or malformed Cesium token',()=>{assert.throws(()=>ionToken('password'));assert.equal(ionToken('eytest.payload.signature'),'eytest.payload.signature');});
+test('cancelled authorization cannot store a key',async()=>{clearMapTiler();const ctl=new AbortController();await assert.rejects(authorizeMapTiler('fake-test-key',{signal:ctl.signal,fetcher:async()=>({ok:true,json:async()=>{ctl.abort();return {version:8,sources:{sat:{type:'raster'}},layers:[]}}})}));assert.equal(mapTilerKey(),'');});
