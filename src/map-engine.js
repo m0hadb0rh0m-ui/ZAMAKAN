@@ -3,7 +3,7 @@ export const MAPTILER_KEY = (import.meta.env?.VITE_MAPTILER_PUBLIC_KEY || '').tr
 export const OPEN_STYLES = {
  streets:'https://tiles.openfreemap.org/styles/liberty',
  light:'https://tiles.openfreemap.org/styles/positron',
- dark:'https://tiles.openfreemap.org/styles/dark'
+ dark:'https://tiles.openfreemap.org/styles/fiord'
 };
 const maptilerStyles={satellite:'satellite-v4',hybrid:'hybrid-v4',terrain:'outdoor-v4',topographic:'topo-v4'};
 export const MODES=['streets','light','dark','satellite','hybrid','terrain','topographic'];
@@ -30,7 +30,7 @@ export function prepareStyle(style,mode){
   if(l.type==='fill'&&l['source-layer']==='building')delete l.maxzoom;
  }
  // OpenMapTiles Liberty omits house numbers from its default style.
- if(style.sources.openmaptiles&&!style.layers.some(l=>l['source-layer']==='housenumber')){
+ if(OPEN_STYLES[mode]&&style.sources.openmaptiles&&!style.layers.some(l=>l['source-layer']==='housenumber')){
   style.layers.push({id:'z-house-number',type:'symbol',source:'openmaptiles','source-layer':'housenumber',minzoom:17,layout:{'text-field':['to-string',['get','housenumber']],'text-font':['Noto Sans Regular'],'text-size':10},paint:{'text-color':mode==='dark'?'#e4e9ef':'#59616a','text-halo-color':mode==='dark'?'#202630':'#fff','text-halo-width':1}});
  }
  return style;

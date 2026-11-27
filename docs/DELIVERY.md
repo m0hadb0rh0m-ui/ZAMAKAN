@@ -1,4 +1,6 @@
-# Delivery report — 0.1.0
+# Historical delivery report — 0.1.0
+
+For the newer feature branch and live browser results see [ULTRA](ULTRA.md).
 2026-11-27. Actual implementation session, not an asserted 60-minute execution.
 
 ## Tests actually run

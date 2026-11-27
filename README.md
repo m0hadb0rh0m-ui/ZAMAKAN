@@ -1,4 +1,4 @@
-# زَمَكان | ZAMAKAN 0.1.0
+# زَمَكان | ZAMAKAN ULTRA
 Global Earth, Weather, Disaster & Space Intelligence
 
 **Research MVP — not a certified early warning or emergency system.**
@@ -29,19 +29,17 @@ npx cap open android
 ## الكمبيوتر: PWA
 انشر الملفات الناتجة `dist/` عبر HTTPS. افتح باستخدام Edge/Chrome واختر Install app إذا أتاح المتصفح ذلك. ليس ملف EXE مستقلًا. Dockerfile لتشغيل خادم الإنتاج، وخدمة HTTPS تكون على مستوى موازن/خادم الاستضافة.
 
-## الموجود فعليًا
-- MapLibre globe/mercator مع خطوط سواحل Natural Earth الحقيقية (دقة 1:110m، ليست خريطة شوارع أو صور أقمار).
-- اختيار موقع بالنقر، البحث عن المدن عبر GeoNames/Open-Meteo، GPS بإذن المتصفح، قياس مسافة الدائرة العظمى.
-- طبقة NASA GIBS MODIS Terra اختيارية بتاريخ محدد؛ مربعات 256px، حتى zoom 9، قد توجد فجوات أو سحب؛ لا تمثل التصوير اللحظي.
-- طبقات زلازل USGS وEONET للأحداث ذات الهندسة النقطية فقط؛ مؤشر NOAA Kp.
-- طقس حالي نموذجي وتوقعات بالساعة؛ جودة الهواء والأمواج عند الطلب.
-- شريط زمني UTC يعرض بيانات التغذية المتوفرة وناتج النموذج؛ ليس أرشيفًا كاملًا أو محاكاة.
-- AR/EN وRTL/LTR، تصميم متجاوب، مظهر فاتح وداكن، منصة بيانات واضحة المصدر.
-- محلل إحصائي حتمي بسيط؛ ليس LLM ولا يقدم تحذيرات رسمية.
-- فشل الشبكة يظهر غير متاح أو قديم عند وجود نسخة ذاكرة سابقة.
-- خادم ملفات HTTP صغير بحدود مسارات وCSP؛ لا API أسرار أو حسابات.
+## الموجود فعليًا — ULTRA
+- OpenFreeMap / OpenMapTiles vector street maps via MapLibre GL — real streets, POIs and building footprints where mapped.
+- 2D / 3D building extrusions and globe, adaptive camera zoom, map-first responsive UI, Arabic/English.
+- Photon / OpenStreetMap geographic search, autocomplete, reverse lookup and coordinates; optional licensed MapTiler integration.
+- MapTiler satellite HD, hybrid, outdoor/topographic and DEM require an owner-approved restricted public key. No charges activated.
+- USGS and NASA EONET clustered events; scientific NASA MODIS overlay; NOAA Kp; Open-Meteo weather, air and marine; nine-point weather model overlay, distance and timeline.
+- Native Capacitor geolocation with foreground permissions; browser smoke tests and debug APK/AAB build workflow.
+- Sources, limits, known gaps and setup: [ULTRA technical notes](docs/ULTRA.md).
 
 ## التوثيق
+- [ULTRA technical notes](docs/ULTRA.md)
 - [Architecture and API](docs/ARCHITECTURE.md)
 - [Data sources and licenses](docs/SOURCES.md)
 - [Security, tests and roadmap](docs/DELIVERY.md)

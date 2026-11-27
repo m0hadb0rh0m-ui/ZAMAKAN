@@ -43,7 +43,7 @@ export async function searchPlaces(query,{language='ar',position,signal,reverse=
   if(!reverse&&position)params.set('proximity',position.lon+','+position.lat);
   url='https://api.maptiler.com/geocoding/'+(reverse?position.lon+','+position.lat:encodeURIComponent(q))+'.json';
  }else{
-  if(!reverse)params.set('q',q);
+  if(!reverse){params.set('q',q);if(position&&validCoords(position.lon,position.lat)){params.set('lon',position.lon.toFixed(3));params.set('lat',position.lat.toFixed(3));}}
   if(language==='en')params.set('lang','en');
   if(reverse){params.set('lon',position.lon);params.set('lat',position.lat);}
   url=photon+(reverse?'/reverse/':'/api/');
