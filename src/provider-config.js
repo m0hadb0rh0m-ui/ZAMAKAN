@@ -1,5 +1,5 @@
 // A public client credential is not a secret; never accept account/admin credentials.
-let mapKey=(import.meta.env?.VITE_MAPTILER_PUBLIC_KEY||'').trim();
+let mapKey='',cesiumToken='',weatherEnabled=false;
 const normalize=v=>String(v??'').trim();
 export function mapTilerKey(){return mapKey;}
 export function clearMapTiler(){mapKey='';}
@@ -19,4 +19,20 @@ export function ionToken(value){
  // Cesium ion client access tokens are JWT-shaped, not account passwords.
  if(t.length>4096||!/^ey[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(t))throw Error('Invalid client token');
  return t;
+}
+
+export function clientCapabilities(){return {maps:Boolean(mapKey),reality:Boolean(cesiumToken),weather:weatherEnabled};}
+export function configuredIonToken(){return cesiumToken;}
+export function applyClientConfig(data){
+ if(data?.version!==1||typeof data.weatherEnabled!=='boolean')throw Error('Invalid provider configuration');
+ const map=normalize(data.mapTilerPublicKey),ion=normalize(data.cesiumPublicToken);
+ const validMap=/^[A-Za-z0-9_-]{8,160}$/.test(map)?map:'';
+ let validIon='';try{validIon=ionToken(ion);}catch{}
+ mapKey=validMap;cesiumToken=validIon;weatherEnabled=data.weatherEnabled;
+ return clientCapabilities();
+}
+export async function loadClientConfig(url,{fetcher=globalThis.fetch,signal}={}){
+ const r=await fetcher(url,{signal:signal||AbortSignal.timeout(10000),credentials:'omit',cache:'no-store',redirect:'error'});
+ if(!r.ok)throw Error('Provider configuration unavailable');
+ return applyClientConfig(await r.json());
 }

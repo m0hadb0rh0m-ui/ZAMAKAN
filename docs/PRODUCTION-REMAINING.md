@@ -1,14 +1,7 @@
 # ZAMAKAN ULTRA — production readiness, second stage
 
 ## Licensed imagery
-Open Settings → Licensed map providers. Enter a **client-use public MapTiler key**
-restricted to approved production web origins / Android client configuration. The
-application requests the official satellite-v4 style to check access, then switches
-to Satellite HD. The same key enables hybrid, terrain and DEM. It is kept in JS
-memory only for this session; Remove key switches back to streets. Never paste
-account/admin secrets or use a key copied from another application. A production
-deployment can instead inject VITE_MAPTILER_PUBLIC_KEY at build time (public client
-keys are visible in web bundles; restrict them at the provider). Coverage, imagery
+The owner configures a restricted public MapTiler key on the HTTPS backend once. The app automatically enables authorized satellite, hybrid, terrain and DEM styles. There are no customer key inputs. See [owner setup](OWNER-PROVIDERS.md). Coverage, imagery
 dates and resolution depend on the provider; no fabricated capture dates.
 No paid plan has been activated. The current setup has no project key, so provider
 authorization, satellite tile rendering and usage quotas are still acceptance gates.
@@ -81,3 +74,5 @@ Overpass request for a public Berlin building returned HTTP 503 in this
 environment; provider lookup remains unverified live, and the UI reports the
 failure rather than claiming a height. Licensed imagery and photorealistic
 3D were not rendered because no authorized keys were supplied.
+
+> Current owner configuration supersedes earlier key-entry instructions: [OWNER-PROVIDERS.md](OWNER-PROVIDERS.md). The customer UI no longer contains provider credentials.

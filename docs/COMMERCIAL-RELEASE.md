@@ -36,10 +36,11 @@ No worldwide authoritative coverage is claimed.
    For internet deployment require a managed authenticated API gateway,
    distributed rate limits, provider billing alerts and hard caps as applicable.
    Weather service avoids API caching; application memory retains recent model data.
-4. Deployment: set VITE_RELEASE_MODE=commercial, VITE_MAPTILER_PUBLIC_KEY,
-   VITE_CESIUM_PUBLIC_TOKEN and VITE_WEATHER_API_BASE (HTTPS .../api/weather).
-   Client tokens are inspectable in binaries by design; never put privileged
-   management tokens or secret weather keys in VITE_ variables.
+4. Deployment: set VITE_RELEASE_MODE=commercial and VITE_BACKEND_URL to the owner HTTPS server only.
+   Set MAPTILER_PUBLIC_KEY and CESIUM_PUBLIC_TOKEN as SERVER environment variables.
+   Runtime /api/client-config returns only restricted public client credentials.
+   They are not baked into the APK, but may be inspected in network traffic.
+   Never put privileged management tokens or secret weather keys in client config.
    Without approved configuration the commercial mode cannot silently call the
    noncommercial hosted weather, Photon or Overpass endpoints.
 
@@ -69,10 +70,9 @@ keytool -export -rfc -keystore zamakan-upload.p12 -alias zamakan-upload -file up
 keytool -list -v -keystore zamakan-upload.p12 -alias zamakan-upload
 ```
 Keep encrypted keystore and password backed up independently; do not send in chat.
-Environment secrets: MAPTILER_PUBLIC_KEY, CESIUM_PUBLIC_TOKEN,
-ANDROID_UPLOAD_KEYSTORE_B64 (base64 of encrypted keystore),
+Environment secrets: ANDROID_UPLOAD_KEYSTORE_B64 (base64 of encrypted keystore),
 ANDROID_STORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD.
-Environment variables: WEATHER_API_BASE, ANDROID_UPLOAD_CERT_SHA256 (registered
+Environment variables: BACKEND_URL, ANDROID_UPLOAD_CERT_SHA256 (registered
 upload certificate fingerprint). The workflow checks actual provider HTTP access,
 then signs a release build and verifies both APK/AAB against the expected public
 certificate, publishes binaries and checksums only. Run with a monotonically

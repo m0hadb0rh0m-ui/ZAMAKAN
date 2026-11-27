@@ -27,9 +27,7 @@ jobs:
     environment: production
     env:
       VITE_RELEASE_MODE: commercial
-      VITE_MAPTILER_PUBLIC_KEY: ${{ secrets.MAPTILER_PUBLIC_KEY }}
-      VITE_CESIUM_PUBLIC_TOKEN: ${{ secrets.CESIUM_PUBLIC_TOKEN }}
-      VITE_WEATHER_API_BASE: ${{ vars.WEATHER_API_BASE }}
+      VITE_BACKEND_URL: ${{ vars.BACKEND_URL }}
       ZAMAKAN_VERSION_CODE: ${{ inputs.version_code }}
       ZAMAKAN_VERSION_NAME: ${{ inputs.version_name }}
     steps:

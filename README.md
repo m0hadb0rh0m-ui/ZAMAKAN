@@ -33,7 +33,7 @@ npx cap open android
 - OpenFreeMap / OpenMapTiles vector street maps via MapLibre GL — real streets, POIs and building footprints where mapped.
 - 2D / 3D building extrusions and globe, adaptive camera zoom, map-first responsive UI, Arabic/English.
 - Photon / OpenStreetMap geographic search, autocomplete, reverse lookup and coordinates; optional licensed MapTiler integration.
-- MapTiler satellite HD, hybrid, outdoor/topographic and DEM require an owner-approved restricted public key. No charges activated.
+- MapTiler satellite HD, hybrid, outdoor/topographic and DEM require an owner-approved restricted public key. No charges activated. See [owner-only provider setup](docs/OWNER-PROVIDERS.md); customers never enter keys.
 - USGS and NASA EONET clustered events; scientific NASA MODIS overlay; NOAA Kp; Open-Meteo weather, air and marine; nine-point weather model overlay, distance and timeline.
 - Native Capacitor geolocation with foreground permissions; browser smoke tests and debug APK/AAB build workflow.
 - Sources, limits, known gaps and setup: [ULTRA technical notes](docs/ULTRA.md).

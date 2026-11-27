@@ -2,11 +2,12 @@
 // builds never silently use a non-commercial endpoint.
 const env=import.meta.env||{};
 export const COMMERCIAL=env.VITE_RELEASE_MODE==='commercial';
-export const CONFIGURED_ION=(env.VITE_CESIUM_PUBLIC_TOKEN||'').trim();
+const backend=approvedWeatherBase(env.VITE_BACKEND_URL||'');
+export const CLIENT_CONFIG_URL=backend?backend+'/api/client-config':'';
 export function approvedWeatherBase(value){
  try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password&&!u.search&&!u.hash?u.href.replace(/\/$/,''):'';}catch{return '';}
 }
-export const WEATHER_BASE=approvedWeatherBase(env.VITE_WEATHER_API_BASE||'');
+export const WEATHER_BASE=backend?backend+'/api/weather':'';
 export const weatherKinds=['weather','air','marine'];
 export const freeWeatherEndpoints={weather:'https://api.open-meteo.com/v1/forecast',air:'https://air-quality-api.open-meteo.com/v1/air-quality',marine:'https://marine-api.open-meteo.com/v1/marine'};
 export function weatherEndpoint(kind,{commercial=COMMERCIAL,base=WEATHER_BASE}={}){

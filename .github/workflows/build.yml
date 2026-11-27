@@ -36,6 +36,11 @@ jobs:
         with:
           name: ZAMAKAN-web
           path: dist/
+      - name: Verify owner configuration and customer UI
+        run: |
+          PORT=4175 MAPTILER_PUBLIC_KEY=test-public-key CESIUM_PUBLIC_TOKEN=eytest.payload.signature node server/index.js &
+          sleep 2
+          python tests/owner_config_smoke.py
       - name: Verify commercial profile fails closed without credentials
         run: |
           VITE_RELEASE_MODE=commercial npm run build

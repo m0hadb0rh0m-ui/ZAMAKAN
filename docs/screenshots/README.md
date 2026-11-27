@@ -11,5 +11,5 @@ Captured with live OpenFreeMap, Photon and Open-Meteo responses in Chromium at 1
 - [Scientific weather panel](science.jpg)
 - [Regional numerical weather sample overlay](weather-grid.jpg)
 - [Continuous regional weather surface (live model values)](continuous-weather.jpg)
-- [Licensed provider configuration (no key entered)](provider-settings.jpg)
+- [Customer settings (no provider fields)](provider-settings.jpg)
 - [Official municipal roof height on the live map (NYC)](municipal-height.jpg)
