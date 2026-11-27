@@ -1,4 +1,7 @@
 const paths={
+ user:'<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>',
+ bookmark:'<path d="M6 3h12v18l-6-4-6 4z"/>',
+ share:'<path d="M12 15V3m-5 5 5-5 5 5M5 12v8h14v-8"/>',
  search:'<circle cx="11" cy="11" r="7"/><path d="m16 16 4 4"/>',
  locate:'<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/>',
  compass:'<circle cx="12" cy="12" r="9"/><path d="m15 9-2 5-5 2 2-5z"/>',

@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readPreferences,writePreferences,readPlaces,savePlaces,toggleSaved,availableModes,freshness} from '../src/experience.js';
+import {nearestHour} from '../src/data.js';
+const storage=()=>{const m=new Map();return {getItem:k=>m.get(k),setItem:(k,v)=>m.set(k,v)}};
+test('preferences persist and reject unknown values',()=>{const s=storage();writePreferences({lang:'en',theme:'dark',view:'pro',quality:'invalid'},s);const p=readPreferences(s);assert.equal(p.lang,'en');assert.equal(p.theme,'dark');assert.equal(p.view,'pro');assert.equal(p.quality,'auto');});
+test('saved places are local, deduplicated and removable',()=>{const s=storage(),p={lon:34.3,lat:31.34};let a=toggleSaved([],p,'Place');assert.equal(a.length,1);assert.ok(savePlaces(a,s));assert.deepEqual(readPlaces(s),a);assert.equal(toggleSaved(a,p,'Place').length,0);});
+test('customer sees only entitled map modes',()=>{const paid=m=>m==='satellite';assert.deepEqual(availableModes(['streets','satellite'],'',paid),['streets']);assert.deepEqual(availableModes(['streets','satellite'],'public',paid),['streets','satellite']);});
+test('source status never counts failed or stale results as fresh',()=>{assert.deepEqual(freshness({a:{state:'stale',retrieved:100},b:{state:'unavailable'}}),{latest:null,available:false,degraded:true});assert.equal(freshness({a:{state:'available',retrieved:30}}).latest,30);});
+test('nearest model hour uses absolute difference and rejects distant samples',()=>{const d={hourly:{time:['2026-01-01T01:00','2026-01-01T02:00'],temperature_2m:[5,8]}};assert.equal(nearestHour(d,Date.parse('2026-01-01T01:10Z')).values.temperature_2m,5);assert.equal(nearestHour(d,Date.parse('2026-01-02T01:00Z')),null);});
