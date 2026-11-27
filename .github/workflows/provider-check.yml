@@ -1,6 +1,9 @@
 name: Owner provider access check
 on:
   workflow_dispatch:
+  push:
+    branches: [feature/zamakan-ultra-map-ui]
+    paths: ['.github/workflows/provider-check.yml', 'scripts/check-owner-keys.mjs']
 permissions:
   contents: read
 jobs:
