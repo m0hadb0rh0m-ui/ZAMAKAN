@@ -2,6 +2,7 @@ export const destinations=[
  ['earth','earth','الرئيسية','Home'],['map','map','الخريطة','Map'],['observe','weather','الرصد','Observe'],['lab','fft','المختبر','Lab'],['more','settings','المزيد','More']
 ];
 export const modules=[
+ ['ensemble','models','توقعات التجميع','Ensemble forecasts','GEFS · نطاق عدم اليقين','GEFS · forecast spread','observe'],
  ['weather','weather','الطقس','Weather','توقعات ومقارنة النماذج','Forecasts and model comparisons','observe'],
  ['disasters','disasters','الكوارث','Natural events','زلازل وحرائق وبراكين','Earthquakes, fires and volcanoes','observe'],
  ['space','space','الفضاء','Space','نشاط شمسي ومدارات','Solar activity and orbits','observe'],

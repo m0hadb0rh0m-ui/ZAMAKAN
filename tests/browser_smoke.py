@@ -26,6 +26,7 @@ with sync_playwright() as p:
   ds=[(start+timedelta(days=i)).strftime('%Y-%m-%d') for i in range((end-start).days+1)]
   route.fulfill(json={'latitude':31.35,'longitude':34.31,'daily_units':{'temperature_2m_mean':'°C','precipitation_sum':'mm'},'daily':{'time':ds,'temperature_2m_mean':[20]*len(ds),'precipitation_sum':[1]*len(ds)}})
  page.route('https://archive-api.open-meteo.com/v1/archive?**',mock_climate)
+ page.route('https://ensemble-api.open-meteo.com/v1/ensemble?**',lambda route:route.fulfill(json={'latitude':31.35,'longitude':34.31,'utc_offset_seconds':0,'hourly_units':{'temperature_2m':'°C','precipitation':'mm'},'hourly':{'time':['2026-01-01T00:00','2026-01-01T01:00'],'temperature_2m':[20,21],'temperature_2m_member01':[18,19],'precipitation':[0,0],'precipitation_member01':[2,0]}}))
  page.route('https://api.weather.gov/alerts/active',lambda route:route.fulfill(json={'type':'FeatureCollection','features':[]}))
  page.goto(BASE,wait_until='domcontentloaded',timeout=30000)
  assert page.locator('#nav button').count()==5
@@ -48,6 +49,12 @@ with sync_playwright() as p:
  assert page.locator('#map').is_hidden()
  page.get_by_role('button',name='Fetch and compare').click()
  page.get_by_text('Mean temperature difference',exact=True).wait_for(timeout=15000)
+ page.locator('#nav [data-tab=observe]').click()
+ page.locator('#panel [data-tab=ensemble]').click()
+ page.get_by_role('button',name='Fetch three days').click()
+ page.get_by_text('50.0 %',exact=True).wait_for(timeout=15000)
+ page.get_by_label('Forecast valid time UTC').select_option('1')
+ page.get_by_text('0.0 %',exact=True).wait_for(timeout=15000)
  page.locator('#nav [data-tab=more]').click()
  page.locator('#panel [data-tab=projects]').click()
  page.get_by_label('Project name').fill('Test AOI')
@@ -128,6 +135,6 @@ with sync_playwright() as p:
  page.wait_for_timeout(800)
  assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
  page.screenshot(path='/tmp/zamakan-mobile.png')
- print(json.dumps({'browser':'Chromium','checks':'globe canvas, projection controls, RTL/LTR, timeline, FFT worker, grid particles and comparison (fixtures), imported 3D building, CAP XML and feed (fixture), AI disabled state, language settings, text sizes, map focus, mobile overflow','page_errors':errors,'status':page.locator('#panel').inner_text()[:1000]},ensure_ascii=False))
+ print(json.dumps({'browser':'Chromium','checks':'globe canvas, projection controls, RTL/LTR, timeline, climate and GEFS member statistics (fixtures), FFT worker, grid particles and comparison (fixtures), imported 3D building, CAP XML and feed (fixture), AI disabled state, language settings, text sizes, map focus, mobile overflow','page_errors':errors,'status':page.locator('#panel').inner_text()[:1000]},ensure_ascii=False))
  assert not errors, errors
  b.close()

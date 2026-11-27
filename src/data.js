@@ -1,5 +1,6 @@
 import {attachEnvelope} from './envelope.js';
 import {imageryTiles} from './imagery.js';
+import {decodeEnsemble} from './ensemble.js';
 import {decodeClimate} from './climate.js';
 import {cacheGet,cachePut,clearCache} from './offline-store.js';
 export const SOURCES = {
@@ -7,6 +8,7 @@ export const SOURCES = {
  earthquakesHistory:{name:'USGS',url:'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_month.geojson',docs:'https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php',kind:'observed',ttl:900000},
  hazards:{name:'NASA EONET',url:'https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=100',docs:'https://eonet.gsfc.nasa.gov/docs/v3',kind:'reported',ttl:900000},
  space:{name:'NOAA SWPC',url:'https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json',docs:'https://services.swpc.noaa.gov/products/',kind:'estimated',ttl:300000},
+ ensemble:{name:'NOAA GEFS / Open-Meteo',url:'https://ensemble-api.open-meteo.com/v1/ensemble',docs:'https://open-meteo.com/en/docs/ensemble-api',kind:'forecast',ttl:1800000},
  climate:{name:'ERA5 / Open-Meteo',url:'https://archive-api.open-meteo.com/v1/archive',docs:'https://open-meteo.com/en/docs/historical-weather-api',kind:'reanalysis',ttl:86400000},
  weather:{name:'Open-Meteo',url:'https://api.open-meteo.com/v1/forecast',docs:'https://open-meteo.com/en/docs',kind:'forecast',ttl:900000},
  air:{name:'Open-Meteo / CAMS',url:'https://air-quality-api.open-meteo.com/v1/air-quality',docs:'https://open-meteo.com/en/docs/air-quality-api',kind:'forecast',ttl:900000},
@@ -61,7 +63,7 @@ export async function fetchSource(key,query='',fetcher=globalThis.fetch){
  const res=await fetcher(s.url+(query?(s.url.includes('?')?'&':'?')+query:''),{signal:AbortSignal.timeout(lowData?9000:18000),credentials:'omit',referrerPolicy:'no-referrer'});
  if(!res.ok)throw Error('HTTP '+res.status);
  const raw=fetcher===globalThis.fetch&&res.body?await boundedJSON(res):await res.json();
- const data=key.startsWith('earthquakes')?earthquakes(raw):key==='hazards'?hazards(raw):key==='space'?kp(raw):key==='climate'?decodeClimate(raw,new URLSearchParams(query).get('start_date'),new URLSearchParams(query).get('end_date')):model(raw);
+ const data=key.startsWith('earthquakes')?earthquakes(raw):key==='hazards'?hazards(raw):key==='space'?kp(raw):key==='ensemble'?decodeEnsemble(raw):key==='climate'?decodeClimate(raw,new URLSearchParams(query).get('start_date'),new URLSearchParams(query).get('end_date')):model(raw);
  const result=attachEnvelope(key,s,{data,state:'available',retrieved:Date.now(),source:s.name,sourceUrl:s.url,kind:s.kind},query);memory.set(id,result);if(memory.size>48)memory.delete(memory.keys().next().value);if(fetcher===globalThis.fetch)await cachePut(id,result);return result;
  }catch(e){return attachEnvelope(key,s,old?{...old,state:'stale',error:String(e.message)}:{data:null,state:'unavailable',retrieved:null,source:s.name,sourceUrl:s.url,kind:s.kind,error:String(e.message)},query);}
  finally{inflight.delete(id);}})();

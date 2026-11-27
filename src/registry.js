@@ -7,6 +7,7 @@ export const REGISTRY=[
  ['NASA EONET','Reported natural events','https://eonet.gsfc.nasa.gov/docs/v3','partial'],
  ['GDACS','Multi-hazard reports','https://www.gdacs.org/','partial'],
  ['Copernicus GloFAS / GFM','River flood forecasts and extent','https://global-flood.emergency.copernicus.eu/','backend'],
+ ['NOAA GEFS','31-member forecast spread via Open-Meteo','https://open-meteo.com/en/docs/ensemble-api','partial'],
  ['ECMWF IFS / AIFS','Forecast GRIB','https://www.ecmwf.int/en/forecasts/datasets/open-data','partial'],
  ['CAMS','Atmospheric composition','https://ads.atmosphere.copernicus.eu/','partial'],
  ['OpenAQ','Station observations','https://docs.openaq.org/','key'],

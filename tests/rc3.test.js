@@ -1,0 +1,8 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {decodeEnsemble,ensembleQuery,ensembleCSV,percentile} from '../src/ensemble.js';
+import {fetchSource} from '../src/data.js';
+const fixture=()=>({latitude:1,longitude:2,utc_offset_seconds:0,hourly_units:{temperature_2m:'°C',precipitation:'mm'},hourly:{time:['2026-01-01T00:00','2026-01-01T01:00'],temperature_2m:[10,null],temperature_2m_member01:[20,null],precipitation:[0,null],precipitation_member01:[2,-1]}});
+test('GEFS empirical percentiles and wet member fraction ignore missing values',()=>{const d=decodeEnsemble(fixture());assert.equal(d.rows[0].median,15);assert.equal(d.rows[0].p10,11);assert.equal(d.rows[0].p90,19);assert.equal(d.rows[0].wetFraction,.5);assert.equal(d.rows[0].temperatureMembers,2);assert.equal(d.rows[1].median,null);assert.equal(d.rows[1].wetFraction,null);assert.equal(percentile([],0.5),null);assert.match(ensembleCSV(d),/2026-01-01T01:00Z,0,0,,,,/);});
+test('GEFS rejects malformed arrays, units, times and coordinates',()=>{const f=fixture();f.hourly.temperature_2m=[1];assert.throws(()=>decodeEnsemble(f));assert.throws(()=>decodeEnsemble({...fixture(),utc_offset_seconds:3600}));assert.throws(()=>ensembleQuery(181,0));assert.match(ensembleQuery(2,1),/models=gfs025/);});
+test('GEFS fetch attaches forecast source and valid range without invented issue time',async()=>{const r=await fetchSource('ensemble',ensembleQuery(2,1),async()=>({ok:true,json:async()=>fixture()}));assert.equal(r.kind,'forecast');assert.equal(r.envelope.issueTime,null);assert.equal(r.envelope.timeRange.start,'2026-01-01T00:00:00.000Z');assert.equal(r.envelope.timeRange.end,'2026-01-01T01:00:00.000Z');});

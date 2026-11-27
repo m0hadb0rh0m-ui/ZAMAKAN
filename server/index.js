@@ -19,7 +19,7 @@ const flagProvider=createFlagProvider({raw:process.env.ZAMAKAN_FLAGS_JSON,client
 const auth=createAuth({host,dbPath:process.env.ZAMAKAN_AUTH_DB,publicOrigin:process.env.ZAMAKAN_PUBLIC_ORIGIN});
 let aiBusy=false;
 const aiAllowed=req=>host==='127.0.0.1'&&req.socket.remoteAddress==='127.0.0.1'&&req.headers.host==='127.0.0.1:'+server.address()?.port;
-const csp="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://gibs.earthdata.nasa.gov https://tilecache.rainviewer.com https://tiles.openfreemap.org https://tiles.mapterhorn.com; connect-src 'self' https://api.open-meteo.com https://archive-api.open-meteo.com https://air-quality-api.open-meteo.com https://marine-api.open-meteo.com https://geocoding-api.open-meteo.com https://gibs.earthdata.nasa.gov https://eonet.gsfc.nasa.gov https://earthquake.usgs.gov https://services.swpc.noaa.gov https://api.rainviewer.com https://tilecache.rainviewer.com https://tiles.openfreemap.org https://tiles.mapterhorn.com https://api.weather.gov https://celestrak.org; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'";
+const csp="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://gibs.earthdata.nasa.gov https://tilecache.rainviewer.com https://tiles.openfreemap.org https://tiles.mapterhorn.com; connect-src 'self' https://api.open-meteo.com https://archive-api.open-meteo.com https://ensemble-api.open-meteo.com https://air-quality-api.open-meteo.com https://marine-api.open-meteo.com https://geocoding-api.open-meteo.com https://gibs.earthdata.nasa.gov https://eonet.gsfc.nasa.gov https://earthquake.usgs.gov https://services.swpc.noaa.gov https://api.rainviewer.com https://tilecache.rainviewer.com https://tiles.openfreemap.org https://tiles.mapterhorn.com https://api.weather.gov https://celestrak.org; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'";
 export const server=createServer(async(req,res)=>{
  const headers={'Content-Security-Policy':csp,'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Frame-Options':'DENY','Permissions-Policy':'geolocation=(self), camera=(), microphone=()'};
  const send=(code,body,extra={})=>{res.writeHead(code,{...headers,...extra});res.end(req.method==='HEAD'?undefined:body);};
@@ -48,7 +48,7 @@ export const server=createServer(async(req,res)=>{
    }catch{return json(503,{error:'Local model unavailable; verify Ollama and the configured model'});}finally{aiBusy=false;}
  }
  if(!['GET','HEAD'].includes(req.method))return send(405,'Method not allowed',{'Allow':'GET, HEAD'});
- const path=decodeURIComponent(new URL(req.url,'http://localhost').pathname);if(path==='/health')return send(200,JSON.stringify({status:'ok',version:'3.0.0-rc.2'}),{'Content-Type':'application/json'});
+ const path=decodeURIComponent(new URL(req.url,'http://localhost').pathname);if(path==='/health')return send(200,JSON.stringify({status:'ok',version:'3.0.0-rc.3'}),{'Content-Type':'application/json'});
  if(path.includes('\0')||path.includes('\\')||path.split('/').some(x=>x==='..'||x.startsWith('.')))return send(400,'Invalid path');
  const file=resolve(root,'.'+(['/','/status'].includes(path)?'/index.html':path));if(!file.startsWith(root+sep))return send(403,'Forbidden');
  const info=await stat(file);if(!info.isFile())return send(404,'Not found');
