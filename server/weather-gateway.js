@@ -1,3 +1,7 @@
+import {gzip} from 'node:zlib';
+import {promisify} from 'node:util';
+const compress=promisify(gzip);
+import {createSnapshotStore,modelResponse} from './open-weather.js';
 // A bounded commercial gateway. The subscription key never reaches client JS.
 // Rate ceilings are per instance, not a distributed billing guarantee.
 const endpoints={weather:'https://customer-api.open-meteo.com/v1/forecast',air:'https://customer-air-quality-api.open-meteo.com/v1/air-quality',marine:'https://customer-marine-api.open-meteo.com/v1/marine'};
@@ -19,6 +23,7 @@ export function validateWeatherQuery(kind,input){
  p.set('timezone','GMT');return {p,weight:lats.length*Math.max(1,Math.ceil(((p.get('current')||'').split(',').length+(p.get('hourly')||'').split(',').filter(Boolean).length)/10))};
 }
 export function makeWeatherGateway(env=process.env,fetcher=globalThis.fetch){
+ const snapshots=createSnapshotStore(env),open=Boolean(env.WEATHER_DATA_DIR);
  const apiKey=env.OPEN_METEO_COMMERCIAL_KEY||'',allowed=new Set((env.WEATHER_ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean));
  const daily=Number(env.WEATHER_DAILY_BUDGET||0),minute=Number(env.WEATHER_MINUTE_BUDGET||0);
  let day='',spent=0,window=0,burst=0,active=0;
@@ -30,13 +35,32 @@ export function makeWeatherGateway(env=process.env,fetcher=globalThis.fetch){
   if(origin&&!allowed.has(origin))return reply(403,'Origin not approved');
   if(req.method==='OPTIONS')return send(204,'',{...headers,'Access-Control-Allow-Methods':'GET, OPTIONS'});
   if(req.method!=='GET')return reply(405,'Method not allowed');
-  if(!apiKey||!Number.isSafeInteger(daily)||daily<1||!Number.isSafeInteger(minute)||minute<1)return reply(503,'Commercial weather not configured');
+  if((!apiKey&&!open)||!Number.isSafeInteger(daily)||daily<1||!Number.isSafeInteger(minute)||minute<1)return reply(503,'Commercial weather not configured');
+  if(kind==='global'){
+   const now=Date.now(),today=new Date(now).toISOString().slice(0,10),m0=Math.floor(now/60000);
+   if(today!==day){day=today;spent=0;}if(m0!==window){window=m0;burst=0;}
+   if(spent+10>daily||burst+10>minute||active>=8)return reply(429,'Weather request budget reached');
+   spent+=10;burst+=10;
+
+   if(!open)return reply(503,'Open model unavailable');
+   const m=url.searchParams.get('model')||'ifs',at=url.searchParams.get('time');
+   if(!['ifs','aifs-single','gfs'].includes(m)||Array.from(url.searchParams.keys()).some(k=>!['model','time'].includes(k))||at&&!Number.isFinite(Date.parse(at)))return reply(400,'Invalid model request');
+   active++;try{const d=await snapshots.get('weather',m==='ifs'?undefined:m),target=at?Date.parse(at):Date.now();
+    const f=d.frames.reduce((a,b)=>Math.abs(Date.parse(b.time)-target)<Math.abs(Date.parse(a.time)-target)?b:a);
+    if(Math.abs(Date.parse(f.time)-target)>6*3600000)return reply(404,'Forecast time unavailable');
+    const body=JSON.stringify({model:d.model,source:d.source,run:d.run,grid:d.grid,frame:f});
+    const opts={...headers,'Cache-Control':'public, max-age=300',Vary:'Origin, Accept-Encoding'};
+    if(/(?:^|[,\s])gzip(?:[,\s]|$)/.test(req.headers['accept-encoding']||''))return send(200,await compress(body),{...opts,'Content-Encoding':'gzip'});
+    return send(200,body,opts);
+   }catch{return reply(503,'No fresh model snapshot');}finally{active--;}
+  }
   let q;try{q=validateWeatherQuery(kind,url.searchParams);}catch{return reply(400,'Invalid weather request');}
   const now=Date.now(),today=new Date(now).toISOString().slice(0,10),m=Math.floor(now/60000);
   if(today!==day){day=today;spent=0;}if(m!==window){window=m;burst=0;}
   if(spent+q.weight>daily||burst+q.weight>minute||active>=8)return reply(429,'Weather request budget reached');
   spent+=q.weight;burst+=q.weight;active++;
   try{
+   if(open){const data=await snapshots.get(kind);return send(200,JSON.stringify(modelResponse(data,q.p)),headers);}
    q.p.set('apikey',apiKey);
    const r=await fetcher(endpoints[kind]+'?'+q.p,{signal:AbortSignal.timeout(15000),redirect:'error',credentials:'omit'});
    if(!r.ok)return reply(502,'Weather provider unavailable');

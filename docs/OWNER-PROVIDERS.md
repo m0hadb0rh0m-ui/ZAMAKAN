@@ -63,3 +63,16 @@ observable; signing keys remain GitHub production environment secrets.
 - https://docs.maptiler.com/guides/developer/credentials/api-key/
 - https://cesium.com/learn/ion/cesium-ion-access-tokens/
 - https://open-meteo.com/en/terms
+
+## Independent weather option
+For keyless weather, set WEATHER_DATA_DIR to the directory of verified open
+model snapshots instead of OPEN_METEO_COMMERCIAL_KEY. See [OPEN-WEATHER.md](OPEN-WEATHER.md).
+
+### Optional owner credential verification (no deployment)
+Repository Settings → Secrets and variables → Actions → New repository secret:
+`MAPTILER_PUBLIC_KEY`, `CESIUM_PUBLIC_TOKEN`. Set each value once. The
+`Owner provider access check` workflow verifies provider access using them
+without printing them or building a bundle. It is run manually when GitHub
+recognizes the workflow on the default branch; this feature branch alone does
+not enable default-branch dispatch. A passing check does not deploy keys to the
+app: the owner backend must separately receive these environment variables.

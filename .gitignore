@@ -11,3 +11,6 @@ android-benchmark-results/
 *.jks
 *.p12
 release-checksums.sha256
+
+weather-data/
+__pycache__/

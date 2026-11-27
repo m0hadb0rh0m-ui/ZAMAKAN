@@ -7,6 +7,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import './style.css';
 import {clientCapabilities,configuredIonToken,loadClientConfig} from './provider-config.js';
 import {lookupHeight} from './building-height.js';
+import {clearGlobal,renderGlobal,animateWind,loadGlobal as loadGlobalForecast} from './global-weather.js';
 import {renderSurface,surfaceSamples} from './weather-surface.js';
 import {WEATHER_FIELDS,sampleGrid,fetchWeatherGrid,renderWeatherLayer} from './weather-layer.js';
 import {searchPlaces,coordinateQuery} from './search.js';
@@ -45,7 +46,7 @@ $('app').innerHTML=`<main class="map-shell">
  </div>
  <div class="map-status"><span class="live-dot"></span><span id="maptitle"></span><span id="zoomLevel" dir="ltr"></span></div>
  <div id="mapNotice" role="status" hidden></div>
- <section id="layersPanel" class="floating-panel" hidden><div class="panel-heading"><div><small class="eyebrow">MAP ENGINE</small><h2 id="layerTitle"></h2></div>${btn('layersClose','close','Close layers')}</div><div id="baseStyles" class="style-grid"></div><button id="openRealistic" class="realistic-action" type="button" hidden></button><h3 id="overlayTitle"></h3><div class="legend" id="legend"></div><div class="layer-row"><button id="imagery" type="button"></button><input type="date" id="imageDate" aria-label="Scientific imagery date"></div><small id="imageStatus" aria-live="polite"></small><label id="terrainRow" class="dem-row" hidden><input type="checkbox" id="terrain"><span id="terrainLabel"></span></label><p id="layerHelp" class="muted"></p><div id="weatherLayerControls"><h3 id="weatherLayerTitle"></h3><label class="field"><select id="weatherField" aria-label="Weather field"></select></label><button id="weatherGrid" type="button"></button><button id="weatherClear" type="button"></button><label class="dem-row"><input type="checkbox" id="weatherSurface" checked><span id="surfaceLabel"></span></label><div id="weatherScale" class="weather-scale"></div><small id="weatherLayerStatus" class="muted" aria-live="polite"></small></div></section>
+ <section id="layersPanel" class="floating-panel" hidden><div class="panel-heading"><div><small class="eyebrow">MAP ENGINE</small><h2 id="layerTitle"></h2></div>${btn('layersClose','close','Close layers')}</div><div id="baseStyles" class="style-grid"></div><button id="openRealistic" class="realistic-action" type="button" hidden></button><h3 id="overlayTitle"></h3><div class="legend" id="legend"></div><div class="layer-row"><button id="imagery" type="button"></button><input type="date" id="imageDate" aria-label="Scientific imagery date"></div><small id="imageStatus" aria-live="polite"></small><label id="terrainRow" class="dem-row" hidden><input type="checkbox" id="terrain"><span id="terrainLabel"></span></label><p id="layerHelp" class="muted"></p><div id="weatherLayerControls"><h3 id="weatherLayerTitle"></h3><label class="field"><select id="weatherField" aria-label="Weather field"></select></label><button id="weatherGrid" type="button"></button><button id="weatherClear" type="button"></button><label class="dem-row"><input type="checkbox" id="weatherSurface" checked><span id="surfaceLabel"></span></label><div id="globalWeatherControls" hidden><label class="field"><select id="globalModel" aria-label="Forecast model"><option value="ifs">ECMWF IFS / NOAA</option><option value="aifs-single">ECMWF AIFS (AI)</option><option value="gfs">NOAA GFS</option></select></label><button id="globalWeather" type="button"></button><label class="dem-row"><input id="windMotion" type="checkbox"><span id="windMotionLabel"></span></label></div><div id="weatherScale" class="weather-scale"></div><small id="weatherLayerStatus" class="muted" aria-live="polite"></small></div></section>
  <section id="settingsPanel" class="floating-panel" hidden><div class="panel-heading"><h2 id="settingsTitle"></h2>${btn('settingsClose','close','Close settings')}</div><div class="settings-list"><button id="lang">EN</button><button id="theme">${icon('theme')}</button><button id="refresh">${icon('refresh')}</button><span id="utc" dir="ltr"></span></div><p id="settingsHint" class="muted"></p>
 
  <label class="dem-row"><input type="checkbox" id="lowPower"><span id="lowPowerLabel"></span></label><div id="footer"></div></section>
@@ -68,8 +69,18 @@ $('sheetHandle').onpointerdown=e=>{draggedSheet=false;sheetStart=e.clientY;e.cur
 $('sheetHandle').onpointerup=e=>{if(sheetStart!==null&&Math.abs(e.clientY-sheetStart)>35){$('sheet').classList.toggle('expanded',e.clientY<sheetStart);draggedSheet=true;e.preventDefault();}sheetStart=null;};
 $('baseStyles').onclick=e=>{const mode=e.target.closest('[data-mode]')?.dataset.mode;if(!mode)return;if(isCommercialMode(mode)&&!MAPTILER_KEY)return;notice('');changeStyle(mode);};
 let weatherGridData=null,weatherGridAbort,weatherField='temperature_2m',weatherGridState='',surfaceEnabled=true;
+let globalForecast=null,globalAbort,stopWind=()=>{};
 function syncWeatherGrid(){
  if(!mapReady)return;
+ stopWind();clearGlobal(map);
+ if(globalForecast){
+  renderSurface(map,null,weatherField);renderWeatherLayer(map,null,weatherField);
+  const drawn=renderGlobal(map,globalForecast,weatherField);
+  if(drawn&&$('windMotion').checked&&!lowPower&&state.mode==='flat'&&!state.buildings)stopWind=animateWind(map,globalForecast);
+  $('weatherLayerStatus').textContent=(drawn?globalForecast.source+' · '+globalForecast.model+(weatherField==='precipitation'?tr(' · تراكم النموذج',' · model accumulation'):'')+' · '+tr('وقت التوقع: ','Valid time: ')+date(globalForecast.frame.time)+' · '+tr('دورة: ','Run: ')+date(globalForecast.run):tr('الحقل غير متوفر في هذا النموذج','Field unavailable for this model'));
+  $('weatherScale').innerHTML=WEATHER_FIELDS[weatherField].stops.map(([v,c])=>'<span><i style="background:'+c+'"></i>'+v+' '+WEATHER_FIELDS[weatherField].unit+'</span>').join('');
+  return;
+ }
  const continuous=renderSurface(map,weatherGridData,weatherField,surfaceEnabled);
  renderWeatherLayer(map,weatherGridData,weatherField);
  if(weatherGridData){const time=(continuous?surfaceSamples(weatherGridData,weatherField)?.time:null)||weatherGridData.features[0]?.properties.time;$('weatherLayerStatus').textContent=(continuous?tr('سطح إقليمي مستوفى حسابيًا داخل العينات فقط (ليس رادارًا أو قياسات ميدانية). وقت النموذج: ','Regional interpolation within sample coverage (not radar or observations). Model time: '):tr('عينات نموذجية نقطية. وقت النموذج: ','Discrete model samples. Model time: '))+date(time);}
@@ -77,9 +88,20 @@ function syncWeatherGrid(){
 }
 $('weatherField').onchange=e=>{weatherField=e.target.value;syncWeatherGrid();};
 $('weatherSurface').onchange=e=>{surfaceEnabled=e.target.checked;syncWeatherGrid();};
-$('weatherClear').onclick=()=>{weatherGridAbort?.abort();weatherGridData=null;syncWeatherGrid();$('weatherLayerStatus').textContent='';};
+$('weatherClear').onclick=()=>{globalAbort?.abort();globalForecast=null;weatherGridAbort?.abort();weatherGridData=null;syncWeatherGrid();$('weatherLayerStatus').textContent='';};
+$('windMotion').onchange=syncWeatherGrid;
+$('globalWeather').onclick=async()=>{
+ if(!mapReady||!WEATHER_BASE)return;
+ weatherGridAbort?.abort();globalAbort?.abort();const ctl=new AbortController();globalAbort=ctl;$('globalWeather').disabled=true;
+ $('weatherLayerStatus').textContent=tr('تحميل شبكة التوقعات العالمية…','Loading global forecast…');
+ try{const d=await loadGlobalForecast(WEATHER_BASE,$('globalModel').value,state.at,ctl.signal);if(ctl.signal.aborted)return;
+ weatherGridData=null;globalForecast=d;state.mode='flat';state.buildings=false;map.setProjection({type:'mercator'});setBuildings(map,false);map.easeTo({zoom:Math.min(map.getZoom(),3),pitch:0,duration:motion()});syncWeatherGrid();renderChrome();
+ }catch{if(!ctl.signal.aborted)$('weatherLayerStatus').textContent=tr('لا توجد شبكة توقعات جاهزة','No forecast snapshot available');}
+ finally{if(globalAbort===ctl)$('globalWeather').disabled=false;}
+};
 $('weatherGrid').onclick=async()=>{
  if(!mapReady)return;
+ globalAbort?.abort();globalForecast=null;syncWeatherGrid();
  weatherGridAbort?.abort();const controller=new AbortController();weatherGridAbort=controller;$('weatherGrid').disabled=true;
  $('weatherLayerStatus').textContent=tr('جارٍ طلب عينات النموذج…','Fetching model samples…');
  try{
@@ -91,7 +113,7 @@ $('weatherGrid').onclick=async()=>{
  finally{if(weatherGridAbort===controller)$('weatherGrid').disabled=false;}
 };
 let realityAbort,realityDestroy;
-$('lowPower').onchange=e=>{lowPower=e.target.checked;if(map)map.setPixelRatio(Math.min(devicePixelRatio||1,lowPower?1:1.75));};
+$('lowPower').onchange=e=>{lowPower=e.target.checked;syncWeatherGrid();if(map)map.setPixelRatio(Math.min(devicePixelRatio||1,lowPower?1:1.75));};
 function closeReality(){
  realityAbort?.abort();realityDestroy?.();realityDestroy=null;$('realityPanel').hidden=true;$('openRealistic').disabled=false;$('realityCanvas').textContent='';$('map').style.visibility='';map?.resize();
 }
@@ -107,11 +129,11 @@ $('openRealistic').onclick=async()=>{
   realityDestroy=await openRealistic3D($('realityCanvas'),{token,lon:state.position.lon,lat:state.position.lat,signal:ctl.signal,lowPower,onStatus:s=>{if(!ctl.signal.aborted)$('realityStatus').textContent=s==='visible'?tr('مجسمات Google عبر Cesium ion؛ التغطية حسب المزود.','Google photorealistic tiles via Cesium ion; coverage varies.'):tr('بعض المجسمات لم تُحمّل أو تعذر الرسم.','Some tiles or rendering are unavailable.');}});
  }catch{if(!ctl.signal.aborted){closeReality();notice(tr('تعذر تحميل العرض الواقعي الآن.','Photorealistic view unavailable right now.'));}}
 };
-document.addEventListener('visibilitychange',()=>{if(document.hidden){map?.stop();if(!$('realityPanel').hidden)closeReality();}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){stopWind();map?.stop();if(!$('realityPanel').hidden)closeReality();}});
 $('terrain').onchange=()=>{state.terrain=$('terrain').checked;if(mapReady)setTerrain(map,state.terrain);};
 $('compass').onclick=()=>map?.easeTo({bearing:0,pitch:0,duration:motion()});
 $('zoomIn').onclick=()=>map?.zoomIn({duration:motion()});$('zoomOut').onclick=()=>map?.zoomOut({duration:motion()});
-$('buildings').onclick=()=>{state.buildings=!state.buildings;state.mode='flat';if(mapReady){map.setProjection({type:'mercator'});setBuildings(map,state.buildings);map.easeTo({pitch:state.buildings?55:0,zoom:state.buildings?Math.max(15,map.getZoom()):map.getZoom(),duration:motion()});}renderChrome();};
+$('buildings').onclick=()=>{stopWind();state.buildings=!state.buildings;state.mode='flat';if(mapReady){map.setProjection({type:'mercator'});setBuildings(map,state.buildings);map.easeTo({pitch:state.buildings?55:0,zoom:state.buildings?Math.max(15,map.getZoom()):map.getZoom(),duration:motion()});}renderChrome();};
 $('imageDate').value=new Date(Date.now()-2*86400000).toISOString().slice(0,10);$('imageDate').max=new Date().toISOString().slice(0,10);$('imageDate').min='2000-02-24';
 let searchResults=[],searchSequence=0,imagery=false,searchAbort,searchTimer,reverseAbort;
 let lastQuery='',lastLang='';
@@ -176,7 +198,7 @@ async function changeStyle(mode){
  try{
   const style=await fetchStyle(mode,styleRequest.signal);
   if(seq!==styleSequence)return;
-  mapReady=false;
+  stopWind();mapReady=false;
   map.setStyle(style,{diff:false});state.base=mode;if(['streets','light','dark'].includes(mode))document.documentElement.classList.toggle('light',mode!=='dark');
  }catch(e){
   if(seq!==styleSequence)return;
@@ -225,7 +247,7 @@ function renderChrome(){
  $('baseStyles').innerHTML=MODES.filter(m=>!isCommercialMode(m)||MAPTILER_KEY).map(m=>'<button data-mode="'+m+'" class="style-choice '+(m===state.base?'active':'')+'" aria-pressed="'+(m===state.base)+'"><span class="map-swatch '+m+'"></span><b>'+tr(...modeLabels[m])+'</b>'+'</button>').join('');
  const weatherLabels={temperature_2m:['الحرارة','Temperature'],cloud_cover:['السحب','Cloud cover'],precipitation:['الأمطار','Precipitation'],wind_speed_10m:['سرعة الرياح','Wind speed'],surface_pressure:['الضغط','Pressure']};
  $('weatherField').innerHTML=Object.keys(WEATHER_FIELDS).map(k=>'<option value="'+k+'">'+tr(...weatherLabels[k])+'</option>').join('');$('weatherField').value=weatherField;
- $('weatherLayerTitle').textContent=tr('خرائط الطقس الإقليمية','Regional weather maps');$('surfaceLabel').textContent=tr('سطح مستمر مستوفى حسابيًا','Interpolated continuous surface');$('weatherSurface').checked=surfaceEnabled;$('weatherGrid').textContent=tr('تحميل المنطقة الظاهرة','Load visible region');$('weatherClear').textContent=tr('إزالة العينات','Clear samples');
+ $('globalWeatherControls').hidden=!Boolean(WEATHER_BASE&&clientCapabilities().weather);$('globalWeather').textContent=tr('عرض التوقع العالمي','Load global forecast');$('windMotionLabel').textContent=tr('حركة الرياح (توضيحية)','Animated wind (illustrative)');$('weatherLayerTitle').textContent=tr('خرائط الطقس الإقليمية','Regional weather maps');$('surfaceLabel').textContent=tr('سطح مستمر مستوفى حسابيًا','Interpolated continuous surface');$('weatherSurface').checked=surfaceEnabled;$('weatherGrid').textContent=tr('تحميل المنطقة الظاهرة','Load visible region');$('weatherClear').textContent=tr('إزالة العينات','Clear samples');
  $('layerTitle').textContent=tr('أنماط الخريطة','Map styles');$('overlayTitle').textContent=tr('طبقات الرصد','Observation layers');
  $('imagery').textContent=tr('رصد NASA MODIS','NASA MODIS observation');$('terrainLabel').textContent=tr('ارتفاعات التضاريس DEM','DEM elevation');$('terrain').disabled=!MAPTILER_KEY;$('terrain').checked=state.terrain;
  $('layerHelp').textContent=(['satellite','hybrid'].includes(state.base)?tr('تاريخ التقاط الصور غير متاح من النمط؛ قد تختلف الدقة والحداثة حسب المنطقة. ','Acquisition date not supplied by this style; imagery detail and age vary by area. '):'')+tr('ارتفاعات المباني من OpenMapTiles قد تكون محسوبة أو تقديرية؛ لا يمكن تأكيدها من هذا المصدر.','OpenMapTiles building heights may be derived or estimated; provenance is not supplied.');
@@ -245,10 +267,10 @@ function renderChrome(){
  $('timelabel').textContent=tr('الزمان / UTC','Timeline / UTC');$('now').textContent=tr('الآن','Now');$('timelineDate').textContent=date(state.at);$('play').textContent=state.playing?'Ⅱ':'▶';$('time').value=state.offset;
  $('footer').textContent=tr('منصة علمية أولية • ليست خدمة إنذار رسمي • الإحداثيات الافتراضية: خان يونس','Research platform • Not an official warning service • Default location: Khan Younis');
 }
-function sourceMeta(id){let r=state.results[id];return '<div class="meta">'+doc(id)+' · '+status(id)+'<br>'+tr('الاسترجاع','Retrieved')+': '+date(r?.retrieved)+'</div>';}
+function sourceMeta(id){let r=state.results[id];return '<div class="meta">'+(r?.source&&r.source!==SOURCES[id].name?safe(r.source)+' · '+link(r.source.startsWith('NOAA')?'https://nomads.ncep.noaa.gov/':'https://www.ecmwf.int/en/forecasts/datasets/open-data','Data source'):doc(id))+' · '+status(id)+'<br>'+tr('الاسترجاع','Retrieved')+': '+date(r?.retrieved)+'</div>';}
 function metric(label,value,unit){return '<div class="metric"><small>'+label+'</small><strong>'+fmt(value,unit)+'</strong></div>';}
 function weatherCard(){const r=state.results.weather,d=r?.data;const c=d?.current;if(!c)return '<section class="card"><h2>'+tr('الطقس','Weather')+'</h2>'+sourceMeta('weather')+empty()+'</section>';const u=d.current_units||{};const selected=state.offset===0?null:nearestHour(d,state.at);
- const rows=[['temperature_2m','الحرارة','Temperature'],['apparent_temperature','المحسوسة','Feels like'],['relative_humidity_2m','الرطوبة','Humidity'],['surface_pressure','الضغط','Pressure'],['wind_speed_10m','الرياح','Wind'],['wind_direction_10m','الاتجاه','Direction'],['wind_gusts_10m','الهبات','Gusts'],['cloud_cover','السحب','Clouds'],['precipitation','الهطول','Precipitation']];
+ const rows=[['temperature_2m','الحرارة','Temperature'],['apparent_temperature','المحسوسة','Feels like'],['relative_humidity_2m','الرطوبة','Humidity'],['surface_pressure','الضغط','Pressure'],['wind_speed_10m','الرياح','Wind'],['wind_direction_10m','الاتجاه','Direction'],['wind_gusts_10m','الهبات','Gusts'],['cloud_cover','السحب','Clouds'],['precipitation','الهطول (تراكم النموذج)','Precipitation (model accumulation)']];
  return '<section class="card"><h2>'+tr('الطقس','Weather')+'</h2><p class="tag">'+tr('ناتج نموذج جوي — ليس قياس محطة','Model output — not station observation')+'</p>'+sourceMeta('weather')+'<div class="muted">'+date(c.time)+'</div><div class="metrics">'+rows.map(([k,a,b])=>metric(tr(a,b),c[k],u[k]||'')).join('')+'</div>'+(state.offset===0?'':'<h3>'+tr('ساعة الشريط الزمني','Timeline forecast hour')+'</h3>'+(selected?'<div>'+date(selected.time)+'</div><div class="metrics">'+Object.entries(selected.values).map(([k,v])=>metric(k,v,d.hourly_units?.[k]||'')).join('')+'</div>':empty()))+hourChart(d)+'</section>';}
 function hourChart(d){let h=d.hourly;if(!h?.time||!h.temperature_2m)return '';let vals=h.temperature_2m.map((v,i)=>({v,t:h.time[i]})).filter(x=>typeof x.v==='number'&&Number.isFinite(x.v)).slice(0,72);if(vals.length<2)return '';let min=Math.min(...vals.map(x=>x.v)),max=Math.max(...vals.map(x=>x.v));let pts=vals.map((x,i)=>[8+i/(vals.length-1)*284,90-(x.v-min)/Math.max(1,max-min)*74].join(',')).join(' ');return '<h3>'+tr('السلسلة الزمنية للحرارة','Temperature time series')+'</h3><svg viewBox="0 0 300 105" role="img" aria-label="Temperature model curve"><path d="M8 90H292M8 50H292M8 15H292" stroke="currentColor" opacity=".2"/><polyline points="'+pts+'" fill="none" stroke="#54e2cc" stroke-width="2.5"/></svg><small>'+fmt(min,'°C')+' — '+fmt(max,'°C')+' · '+date(vals[0].t)+' → '+date(vals.at(-1).t)+'</small>';}
 function eventCard(){let ev=visibleEvents().sort((a,b)=>Date.parse(b.time)-Date.parse(a.time));let e=state.selected;return '<section class="card"><h2>'+tr('الأحداث الطبيعية','Natural events')+'</h2>'+sourceMeta('earthquakes')+sourceMeta('hazards')+'<p class="muted">'+tr('EONET يعرض الأحداث المبلغ عنها ذات الإحداثيات النقطية؛ ليست جميع البؤر أو تحذيرات الإخلاء.','EONET shows reported point events, not all hotspots or evacuation alerts.')+'</p>'+(e?'<div class="detail"><b>'+safe(e.title)+'</b><p>'+safe(e.category)+' · '+safe(e.source)+' · '+safe(e.status)+'</p><p>'+date(e.time)+' · '+fmt(e.magnitude,e.unit||'')+' '+(e.depth!=null?' / '+fmt(e.depth,'km'):'')+'</p>'+link(e.url,tr('السجل الرسمي','Source record'))+'</div>':'')+'<div class="eventlist">'+(ev.length?ev.slice(0,100).map(x=>'<button class="event" data-event="'+safe(x.id)+'"><i style="background:'+(colors[x.category]||colors.other)+'"></i><div><b>'+safe(x.title)+'</b><small>'+safe(x.source)+' · '+date(x.time)+'</small></div><strong>'+fmt(x.magnitude,x.unit||'')+'</strong></button>').join(''):empty())+'</div></section>';}
@@ -263,7 +285,7 @@ async function loadPosition(){if(!weatherAvailable())return;const ticket=++state
 document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]')?.dataset.tab,ev=e.target.closest('[data-event]')?.dataset.event;if(tab){state.tab=tab;sheetOpen();render();if(['air','marine','weather'].includes(tab))loadPosition();}if(ev){let item=state.events.find(x=>x.id===ev);if(item)showEvent(item);}});
 $('legend').addEventListener('change',e=>{if(e.target.dataset.layer){state.layers[e.target.dataset.layer]=e.target.checked;updateMap();render();}});
 $('lang').onclick=()=>{state.lang=state.lang==='ar'?'en':'ar';render();};$('theme').onclick=()=>document.documentElement.classList.toggle('light');
-$('globe').onclick=()=>{state.mode='globe';state.buildings=false;if(mapReady){setBuildings(map,false);map.setProjection({type:'globe'});map.flyTo({zoom:2.2,pitch:0,duration:motion()});}renderChrome();};$('flat').onclick=()=>{state.mode='flat';state.buildings=false;if(mapReady){map.setProjection({type:'mercator'});setBuildings(map,false);map.easeTo({pitch:0,duration:motion()});}renderChrome();};
+$('globe').onclick=()=>{stopWind();state.mode='globe';state.buildings=false;if(mapReady){setBuildings(map,false);map.setProjection({type:'globe'});map.flyTo({zoom:2.2,pitch:0,duration:motion()});}renderChrome();};$('flat').onclick=()=>{state.mode='flat';state.buildings=false;if(mapReady){map.setProjection({type:'mercator'});setBuildings(map,false);map.easeTo({pitch:0,duration:motion()});}renderChrome();};
 $('refresh').onclick=()=>{if(!mapReady||!$('maperror').hidden)changeStyle(state.base);loadGlobal();refreshProviders().then(()=>loadPosition());};$('gps').onclick=async()=>{
  notice(tr('جارٍ تحديد الموقع…','Finding your location…'));$('gps').disabled=true;
  try{
@@ -288,7 +310,7 @@ $('refresh').onclick=()=>{if(!mapReady||!$('maperror').hidden)changeStyle(state.
 
 $('measure').onclick=()=>{state.measure=!state.measure;state.points=[];updateMap();renderChrome();};
 function timeOffset(v){state.offset=Number(v);state.at=Date.now()+state.offset*3600000;updateMap();render();}
-$('time').oninput=e=>timeOffset(e.target.value);$('now').onclick=()=>{state.playing=false;timeOffset(0);};$('play').onclick=()=>{state.playing=!state.playing;renderChrome();};
+$('time').oninput=e=>timeOffset(e.target.value);$('time').onchange=()=>{if(globalForecast)$('globalWeather').click();};$('now').onclick=()=>{state.playing=false;timeOffset(0);};$('play').onclick=()=>{state.playing=!state.playing;renderChrome();};
 setInterval(()=>{ $('utc').textContent=new Date().toISOString().slice(11,19)+' UTC';if(state.playing&&!document.hidden){if(state.offset>=48){state.playing=false;renderChrome();}else timeOffset(state.offset+1);} },1000);
 setInterval(()=>{if(!document.hidden){loadGlobal();if(state.tab!=='marine'&&state.tab!=='air')loadPosition();}},180000);
 async function refreshProviders(){
@@ -302,7 +324,7 @@ async function refreshProviders(){
   if(oldIon!==configuredIonToken()&&!$('realityPanel').hidden)closeReality();
   if(!MAPTILER_KEY){if(state.terrain&&mapReady)setTerrain(map,false);state.terrain=false;if(isCommercialMode(state.base))changeStyle('streets');}
   if(!clientCapabilities().reality&&!$('realityPanel').hidden)closeReality();
-  if(!weatherAvailable()){weatherGridAbort?.abort();weatherGridData=null;syncWeatherGrid();if(['weather','air','marine'].includes(state.tab))state.tab='earth';}
+  if(!weatherAvailable()){globalAbort?.abort();globalForecast=null;weatherGridAbort?.abort();weatherGridData=null;syncWeatherGrid();if(['weather','air','marine'].includes(state.tab))state.tab='earth';}
   render();
  }catch{/* Public features remain accessible; no credential prompts or logs. */}
 }

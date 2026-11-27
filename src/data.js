@@ -49,7 +49,7 @@ export async function fetchSource(key,query='',fetcher=globalThis.fetch){
  if(!res.ok)throw Error('HTTP '+res.status);
  const raw=await res.json();
  const data=key==='earthquakes'?earthquakes(raw):key==='hazards'?hazards(raw):key==='space'?kp(raw):model(raw);
- const result={data,state:'available',retrieved:Date.now(),source:s.name,kind:s.kind};memory.set(id,result);if(memory.size>48)memory.delete(memory.keys().next().value);return result;
+ const result={data,state:'available',retrieved:Date.now(),source:typeof raw.source==='string'?raw.source+' · '+(raw.model||''):s.name,kind:s.kind};memory.set(id,result);if(memory.size>48)memory.delete(memory.keys().next().value);return result;
  }catch(e){return old?{...old,state:'stale',error:String(e.message)}:{data:null,state:'unavailable',retrieved:null,source:s.name,kind:s.kind,error:String(e.message)};}
  finally{inflight.delete(id);}})();
  inflight.set(id,task);return task;

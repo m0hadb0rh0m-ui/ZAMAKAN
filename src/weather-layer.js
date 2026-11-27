@@ -24,7 +24,7 @@ export function weatherFeatures(raw){
  return rows.flatMap(r=>{
   if(!validCoords(r.longitude,r.latitude)||!r.current?.time)return [];
   const values=Object.fromEntries(Object.keys(WEATHER_FIELDS).filter(k=>typeof r.current[k]==='number'&&Number.isFinite(r.current[k])).map(k=>[k,r.current[k]]));
-  return [{type:'Feature',geometry:{type:'Point',coordinates:[r.longitude,r.latitude]},properties:{...values,time:r.current.time}}];
+  return [{type:'Feature',geometry:{type:'Point',coordinates:[r.longitude,r.latitude]},properties:{...values,time:r.current.time,source:r.source||'Open-Meteo',model:r.model||''}}];
  });
 }
 export async function fetchWeatherGrid(points,signal,fetcher=globalThis.fetch){
@@ -40,7 +40,7 @@ export function renderWeatherLayer(map,data,field){
  if(map.getLayer('z-weather-grid'))map.removeLayer('z-weather-grid');
  if(map.getLayer('z-weather-labels'))map.removeLayer('z-weather-labels');
  if(!data||!WEATHER_FIELDS[field]){if(map.getSource('z-weather'))map.removeSource('z-weather');return;}
- if(!map.getSource('z-weather'))map.addSource('z-weather',{type:'geojson',data,attribution:'Open-Meteo · regional interpolation'});
+ if(!map.getSource('z-weather'))map.addSource('z-weather',{type:'geojson',data,attribution:(data.features[0]?.properties.source||'Weather model')+' · regional interpolation'});
  else map.getSource('z-weather').setData(data);
  const conf=WEATHER_FIELDS[field];
  map.addLayer({id:'z-weather-grid',type:'circle',source:'z-weather',filter:['has',field],paint:{'circle-radius':23,'circle-color':['interpolate',['linear'],['get',field],...conf.stops.flat()],'circle-stroke-color':'#fff','circle-stroke-width':2,'circle-opacity':0.9}});
