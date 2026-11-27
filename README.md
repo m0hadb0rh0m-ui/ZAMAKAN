@@ -1,4 +1,4 @@
-# زَمَكان | ZAMAKAN 2.1.0 RC
+# زَمَكان | ZAMAKAN 3.0.0 RC.1
 Global Earth, Weather, Disaster & Space Intelligence
 
 **Research MVP — not a certified early warning or emergency system.**
@@ -83,3 +83,6 @@ See [report implementation and release gates](docs/release-2.0.md) for scope, ve
 ## 2.1 — Production pilot
 
 See [release and cloud operations](docs/release-2.1.md) for the hosted worker, account sync, CAP registry, 3D scene, optional FCM and verified-signature build workflow.
+
+## 3.0 — Global Intelligence blueprint, candidate 1
+See [blueprint acceptance matrix](docs/release-3.0.md). Builds on the latest 2.1 release branch, not the outdated main branch. Climate, local projects, separate imagery and GIS screens, map layer management and timeline modes are new. This is not a claim of production readiness or full blueprint coverage.

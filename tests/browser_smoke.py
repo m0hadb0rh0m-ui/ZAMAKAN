@@ -20,6 +20,12 @@ with sync_playwright() as p:
   data=[row(i,lat,lon) for i,(lat,lon) in enumerate(zip(latitudes,longitudes))]
   route.fulfill(json=data if len(data)>1 else data[0])
  page.route('https://api.open-meteo.com/v1/forecast?**',mock_forecast)
+ def mock_climate(route):
+  q=parse_qs(urlparse(route.request.url).query)
+  start=datetime.fromisoformat(q['start_date'][0]);end=datetime.fromisoformat(q['end_date'][0])
+  ds=[(start+timedelta(days=i)).strftime('%Y-%m-%d') for i in range((end-start).days+1)]
+  route.fulfill(json={'latitude':31.35,'longitude':34.31,'daily_units':{'temperature_2m_mean':'°C','precipitation_sum':'mm'},'daily':{'time':ds,'temperature_2m_mean':[20]*len(ds),'precipitation_sum':[1]*len(ds)}})
+ page.route('https://archive-api.open-meteo.com/v1/archive?**',mock_climate)
  page.route('https://api.weather.gov/alerts/active',lambda route:route.fulfill(json={'type':'FeatureCollection','features':[]}))
  page.goto(BASE,wait_until='domcontentloaded',timeout=30000)
  assert page.locator('#nav button').count()==5
@@ -37,6 +43,18 @@ with sync_playwright() as p:
   group={'space':'observe','radar':'observe','weather':'observe','fft':'lab','models':'lab','cap':'lab','twin':'map','status':'more','ai':'more'}.get(tab,tab)
   page.locator('#nav [data-tab='+group+']').click()
   if group!=tab: page.locator('#panel [data-tab='+tab+']').first.click()
+ page.locator('#nav [data-tab=observe]').click()
+ page.locator('#panel [data-tab=climate]').click()
+ assert page.locator('#map').is_hidden()
+ page.get_by_role('button',name='Fetch and compare').click()
+ page.get_by_text('Mean temperature difference',exact=True).wait_for(timeout=15000)
+ page.locator('#nav [data-tab=more]').click()
+ page.locator('#panel [data-tab=projects]').click()
+ page.get_by_label('Project name').fill('Test AOI')
+ page.get_by_role('button',name='Save current state').click()
+ page.get_by_text('Test AOI',exact=True).wait_for()
+ page.get_by_role('button',name='Open',exact=True).click()
+ page.get_by_text('Layer manager',exact=True).wait_for()
  go('space')
  assert page.locator('#map').is_hidden()
  assert 'Space weather' in page.locator('#panel').inner_text()

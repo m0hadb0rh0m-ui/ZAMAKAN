@@ -1,9 +1,11 @@
+import {decodeClimate} from './climate.js';
 import {cacheGet,cachePut,clearCache} from './offline-store.js';
 export const SOURCES = {
  earthquakes:{name:'USGS',url:'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson',docs:'https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php',kind:'observed',ttl:90000},
  earthquakesHistory:{name:'USGS',url:'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_month.geojson',docs:'https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php',kind:'observed',ttl:900000},
  hazards:{name:'NASA EONET',url:'https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=100',docs:'https://eonet.gsfc.nasa.gov/docs/v3',kind:'reported',ttl:900000},
  space:{name:'NOAA SWPC',url:'https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json',docs:'https://services.swpc.noaa.gov/products/',kind:'estimated',ttl:300000},
+ climate:{name:'ERA5 / Open-Meteo',url:'https://archive-api.open-meteo.com/v1/archive',docs:'https://open-meteo.com/en/docs/historical-weather-api',kind:'reanalysis',ttl:86400000},
  weather:{name:'Open-Meteo',url:'https://api.open-meteo.com/v1/forecast',docs:'https://open-meteo.com/en/docs',kind:'forecast',ttl:900000},
  air:{name:'Open-Meteo / CAMS',url:'https://air-quality-api.open-meteo.com/v1/air-quality',docs:'https://open-meteo.com/en/docs/air-quality-api',kind:'forecast',ttl:900000},
  marine:{name:'Open-Meteo',url:'https://marine-api.open-meteo.com/v1/marine',docs:'https://open-meteo.com/en/docs/marine-weather-api',kind:'forecast',ttl:900000}
@@ -52,7 +54,7 @@ export async function fetchSource(key,query='',fetcher=globalThis.fetch){
  const res=await fetcher(s.url+(query?(s.url.includes('?')?'&':'?')+query:''),{signal:AbortSignal.timeout(lowData?9000:18000),credentials:'omit',referrerPolicy:'no-referrer'});
  if(!res.ok)throw Error('HTTP '+res.status);
  const raw=await res.json();
- const data=key.startsWith('earthquakes')?earthquakes(raw):key==='hazards'?hazards(raw):key==='space'?kp(raw):model(raw);
+ const data=key.startsWith('earthquakes')?earthquakes(raw):key==='hazards'?hazards(raw):key==='space'?kp(raw):key==='climate'?decodeClimate(raw,new URLSearchParams(query).get('start_date'),new URLSearchParams(query).get('end_date')):model(raw);
  const result={data,state:'available',retrieved:Date.now(),source:s.name,sourceUrl:s.url,kind:s.kind};memory.set(id,result);if(memory.size>48)memory.delete(memory.keys().next().value);if(fetcher===globalThis.fetch)await cachePut(id,result);return result;
  }catch(e){return old?{...old,state:'stale',error:String(e.message)}:{data:null,state:'unavailable',retrieved:null,source:s.name,sourceUrl:s.url,kind:s.kind,error:String(e.message)};}
  finally{inflight.delete(id);}})();
@@ -60,7 +62,7 @@ export async function fetchSource(key,query='',fetcher=globalThis.fetch){
 }
 export function distance(a,b){const r=Math.PI/180,dlat=(b.lat-a.lat)*r,dlon=(b.lon-a.lon)*r,x=Math.sin(dlat/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dlon/2)**2;return 6371.0088*2*Math.asin(Math.sqrt(Math.min(1,x)));}
 export function eventsAt(events,at){return events.filter(e=>Date.parse(e.time)<=at);}
-export function nearestHour(data,at){const hours=data?.hourly?.time;if(!hours?.length)return null;const i=hours.findIndex(t=>Date.parse(iso(t))>=at);return i<0?null:{time:iso(hours[i]),values:Object.fromEntries(Object.entries(data.hourly).filter(([k,v])=>k!=='time'&&Array.isArray(v)).map(([k,v])=>[k,v[i]]))};}
+export function nearestHour(data,at){const hours=data?.hourly?.time;if(!hours?.length)return null;let i=-1,best=30*60000;hours.forEach((t,j)=>{const d=Math.abs(Date.parse(iso(t))-at);if(d<=best){i=j;best=d;}});return i<0?null:{time:iso(hours[i]),values:Object.fromEntries(Object.entries(data.hourly).filter(([k,v])=>k!=='time'&&Array.isArray(v)).map(([k,v])=>[k,v[i]]))};}
 export async function geocode(name,language='ar',fetcher=globalThis.fetch){
  const q=String(name).trim();if(q.length<2||q.length>80)throw Error('Invalid search term');
  const params=new URLSearchParams({name:q,count:'6',language:language==='ar'?'ar':'en',format:'json'});
@@ -70,6 +72,6 @@ export async function geocode(name,language='ar',fetcher=globalThis.fetch){
  return (d.results||[]).filter(x=>validCoords(x.longitude,x.latitude)).map(x=>({name:String(x.name),country:String(x.country||x.country_code||''),admin:String(x.admin1||''),lon:x.longitude,lat:x.latitude}));
 }
 export function gibsTiles(day){
- if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!iso(day+'T00:00:00Z')||day>new Date().toISOString().slice(0,10)||day<'2000-02-24')throw Error('Invalid imagery date');
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||iso(day+'T00:00:00Z')?.slice(0,10)!==day||day>new Date().toISOString().slice(0,10)||day<'2000-02-24')throw Error('Invalid imagery date');
  return ['https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/'+day+'/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg'];
 }
