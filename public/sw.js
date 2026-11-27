@@ -1,4 +1,4 @@
-const CACHE='zamakan-shell-v2-2';
+const CACHE='zamakan-shell-v2-3';
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(async c=>{const r=await fetch('./shell-assets.json',{cache:'no-store'});if(!r.ok)throw Error('Shell manifest unavailable');const files=await r.json();await c.addAll(['./','./icon.svg','./manifest.webmanifest','./land.geojson','./icon-192.png','./icon-512.png',...files]);})));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('zamakan-shell-')&&k!==CACHE).map(k=>caches.delete(k))))));
 self.addEventListener('fetch',event=>{const u=new URL(event.request.url);if(event.request.method!=='GET'||u.origin!==location.origin||u.pathname.includes('/api/'))return;event.respondWith(fetch(event.request).then(r=>{if(r.ok){const copy=r.clone();event.waitUntil(caches.open(CACHE).then(c=>c.put(event.request,copy)));}return r;}).catch(async()=>await caches.match(event.request)|| (event.request.mode==='navigate'?await caches.match('./'):Response.error())));});

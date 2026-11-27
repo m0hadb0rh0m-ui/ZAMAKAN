@@ -8,6 +8,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   android:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production-signing
     steps:
@@ -27,7 +28,7 @@ jobs:
           python3 scripts/android-config.py
           npx cap sync android
       - working-directory: android
-        run: ./gradlew assembleRelease --no-daemon
+        run: ./gradlew assembleRelease bundleRelease --no-daemon
       - name: Sign and verify
         env:
           ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
@@ -50,10 +51,16 @@ jobs:
           "$tools/apksigner" sign --ks "$ks" --ks-key-alias "$ANDROID_KEY_ALIAS" --ks-pass env:ANDROID_STORE_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD --out signed/ZAMAKAN-release.apk signed/aligned.apk
           rm signed/aligned.apk
           "$tools/apksigner" verify --verbose --print-certs signed/ZAMAKAN-release.apk
-          (cd signed && sha256sum ZAMAKAN-release.apk > SHA256SUMS.txt)
+          # The AAB is an Android App Bundle, signed with the owner upload key using jarsigner.
+          cp android/app/build/outputs/bundle/release/app-release.aab signed/ZAMAKAN-play.aab
+          jarsigner -keystore "$ks" -storepass:env ANDROID_STORE_PASSWORD -keypass:env ANDROID_KEY_PASSWORD -digestalg SHA-256 signed/ZAMAKAN-play.aab "$ANDROID_KEY_ALIAS"
+          jarsigner -verify -verbose -certs signed/ZAMAKAN-play.aab > signed/aab-verification.txt
+          grep -q 'jar verified' signed/aab-verification.txt
+          (cd signed && sha256sum ZAMAKAN-release.apk ZAMAKAN-play.aab > SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         with: {name: ZAMAKAN-android-signed, path: signed/, if-no-files-found: error}
   windows:
+    if: github.ref == 'refs/heads/main'
     runs-on: windows-latest
     environment: production-signing
     steps:

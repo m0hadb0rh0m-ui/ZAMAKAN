@@ -25,17 +25,26 @@ jobs:
           sudo chown "$USER" /dev/kvm
           SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           test -x "$SDK/cmdline-tools/latest/bin/sdkmanager"
-          "$SDK/cmdline-tools/latest/bin/sdkmanager" "system-images;android-35;google_apis;x86_64" "platform-tools" "emulator"
-          echo no | "$SDK/cmdline-tools/latest/bin/avdmanager" create avd --force -n zamakan-ci -k 'system-images;android-35;google_apis;x86_64'
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" "system-images;android-36;google_apis;x86_64" "platform-tools" "emulator"
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/zamakan-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+          echo no | "$SDK/cmdline-tools/latest/bin/avdmanager" create avd --force -n zamakan-ci -p "$ANDROID_AVD_HOME/zamakan-ci.avd" -k 'system-images;android-36;google_apis;x86_64'
+          test -f "$ANDROID_AVD_HOME/zamakan-ci.ini"
+          "$SDK/emulator/emulator" -list-avds | grep -x zamakan-ci
           echo "$SDK/emulator" >> "$GITHUB_PATH"
           echo "$SDK/platform-tools" >> "$GITHUB_PATH"
       - name: Install, launch and detect crash
         run: |
           mkdir -p device-results
-          emulator -avd zamakan-ci -no-window -noaudio -no-boot-anim -gpu swiftshader_indirect > device-results/emulator.log 2>&1 &
-          trap 'adb emu kill || true' EXIT
-          timeout 180 adb wait-for-device
-          timeout 180 bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = 1 ]; do sleep 5; done'
+          emulator -list-avds | tee device-results/avds.txt
+          emulator -avd zamakan-ci -no-window -noaudio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > device-results/emulator.log 2>&1 &
+          EMU_PID=$!
+          sleep 5
+          if ! kill -0 "$EMU_PID" 2>/dev/null; then cat device-results/emulator.log; exit 1; fi
+          trap 'adb emu kill || true; tail -50 device-results/emulator.log' EXIT
+          timeout 300 adb wait-for-device
+          timeout 300 bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = 1 ]; do sleep 5; done'
           adb shell input keyevent 82
           adb install -r android/app/build/outputs/apk/debug/app-debug.apk
           adb logcat -c

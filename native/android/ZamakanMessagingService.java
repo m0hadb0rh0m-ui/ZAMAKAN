@@ -17,5 +17,6 @@ public class ZamakanMessagingService extends FirebaseMessagingService {
         if(Build.VERSION.SDK_INT>=26)manager.createNotificationChannel(new NotificationChannel("research_updates","ZAMAKAN research updates",NotificationManager.IMPORTANCE_DEFAULT));
         NotificationCompat.Builder b=new NotificationCompat.Builder(this,"research_updates").setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle("ZAMAKAN").setContentText("Research notification test · اختبار إشعار تجريبي").setAutoCancel(true).setPriority(NotificationCompat.PRIORITY_DEFAULT);
         manager.notify(2100,b.build());
+        getSharedPreferences("zamakan_push",Context.MODE_PRIVATE).edit().putLong("last_received",System.currentTimeMillis()).apply();
     }
 }

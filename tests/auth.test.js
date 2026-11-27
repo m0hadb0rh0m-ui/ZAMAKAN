@@ -20,7 +20,14 @@ test('registration, login, password rotation, session revocation and CSRF',async
   const newCookie=rotated.headers.get('set-cookie').split(';')[0];assert.notEqual(newCookie,cookie);assert.equal((await me(cookie)).user,null);assert.equal((await me(newCookie)).user.username,'member');
   assert.equal((await post('login',{username:'member',password:'test-password-length'})).status,401);
   assert.equal((await post('logout',{},newCookie)).status,200);assert.equal((await me(newCookie)).user,null);
-  assert.equal((await post('login',{username:'member',password:'new-secure-passphrase'})).status,200);
+  const finalLogin=await post('login',{username:'member',password:'new-secure-passphrase'});assert.equal(finalLogin.status,200);
+  const finalCookie=finalLogin.headers.get('set-cookie').split(';')[0];
+  assert.equal((await post('delete',{confirm:true,password:'new-secure-passphrase'},finalCookie,'https://evil.example')).status,403);
+  assert.equal((await post('delete',{confirm:false,password:'new-secure-passphrase'},finalCookie)).status,400);
+  assert.equal((await post('delete',{confirm:true,password:'wrong-password'},finalCookie)).status,401);
+  assert.equal((await post('delete',{confirm:true,password:'new-secure-passphrase'},finalCookie)).status,200);
+  assert.equal((await me(finalCookie)).user,null);
+  assert.equal((await post('login',{username:'member',password:'new-secure-passphrase'})).status,401);
  }finally{app.closeAllConnections();await new Promise(r=>app.close(r));auth.close();}
 });
 test('public account service requires configured HTTPS origin',()=>{

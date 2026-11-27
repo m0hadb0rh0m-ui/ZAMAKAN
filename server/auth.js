@@ -62,13 +62,14 @@ export function createAuth({dbPath,host,publicOrigin='',now=Date.now}){
    const t=token(req);if(t)db.prepare('DELETE FROM sessions WHERE token_hash=?').run(t);
    return json(200,{ok:true},{'Set-Cookie':cookie('',0)});
   }
-  if(!['/api/auth/register','/api/auth/login','/api/auth/password'].includes(path))return json(404,{error:'not-found'});
+  if(!['/api/auth/register','/api/auth/login','/api/auth/password','/api/auth/delete'].includes(path))return json(404,{error:'not-found'});
   let input;try{input=await credentials(req);}catch{return json(400,{error:'invalid-request'});}
   if(!input||typeof input!=='object')return json(400,{error:'invalid-request'});
   let username=userKey(input.username),p=input.password;
-  const change=path.endsWith('/password'),register=path.endsWith('/register');
-  let current=change?session(req):null;if(change&&!current)return json(401,{error:'invalid-credentials'});
-  if(change)username=current.username;
+  const change=path.endsWith('/password'),register=path.endsWith('/register'),remove=path.endsWith('/delete');
+  let current=(change||remove)?session(req):null;if((change||remove)&&!current)return json(401,{error:'invalid-credentials'});
+  if(change||remove)username=current.username;
+  if(remove&&input.confirm!==true)return json(400,{error:'confirmation-required'});
   if(!validUser(username)||typeof p!=='string'||Buffer.byteLength(p)>512||(register&&!validPassword(p))||(change&&!validPassword(input.newPassword)))return json(400,{error:'invalid-credentials-format'});
   if(!rate('user:'+username,10)||register&&!rate('register:'+ip,8))return json(429,{error:'rate-limit'},{'Retry-After':'900'});
   if(activeHashes>=2)return json(503,{error:'try-again'});
@@ -84,6 +85,7 @@ export function createAuth({dbPath,host,publicOrigin='',now=Date.now}){
    }else{
     const salt=u?.salt||'00000000000000000000000000000000',stored=Buffer.from(u?.hash||'00'.repeat(64),'hex'),computed=await hashPassword(p,salt);
     if(!u||!timingSafeEqual(stored,computed))return json(401,{error:'invalid-credentials'});
+    if(remove){db.prepare('DELETE FROM users WHERE id=?').run(u.id);return json(200,{ok:true},{'Set-Cookie':cookie('',0)});}
     if(change){
      const nextSalt=randomBytes(16).toString('hex'),nextHash=(await hashPassword(input.newPassword,nextSalt)).toString('hex');
      db.exec('BEGIN IMMEDIATE');try{db.prepare('UPDATE users SET salt=?,hash=? WHERE id=?').run(nextSalt,nextHash,u.id);db.prepare('DELETE FROM sessions WHERE user_id=?').run(u.id);db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}

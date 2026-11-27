@@ -1,4 +1,4 @@
-# زَمَكان | ZAMAKAN 2.2.0 RC
+# زَمَكان | ZAMAKAN 2.3.0 RC
 Global Earth, Weather, Disaster & Space Intelligence
 
 **Research MVP — not a certified early warning or emergency system.**
@@ -27,6 +27,8 @@ ZAMAKAN is an Earth, weather and space observatory for students, researchers and
 - [دليل المستخدم / User guide](docs/USER-GUIDE.md). Within the app use **More → Start here** or **المزيد ← دليل الاستخدام**.
 
 لا تثبّت حزمة غير موثوقة ولا تتجاوز حماية Windows أو Android. توقيع الإنتاج، إشعارات FCM، تغطية CAP الحية والتوأم الهندسي الكامل لم تُعتمد بعد.
+
+**Google Play preparation:** [Data Safety worksheet](docs/GOOGLE-PLAY-DATA-SAFETY.md) · [privacy and data deletion](https://zamakan-observatory.racingdot32.chatgpt.site/privacy.html). CI builds an unsigned AAB; production signing requires the owner upload key.
 
 ## التشغيل المحلي (Windows / Linux / macOS)
 يتطلب Node.js 22.12+ (يفضل إصدار LTS حديث).

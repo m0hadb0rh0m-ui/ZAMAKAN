@@ -54,7 +54,7 @@ jobs:
       - run: python3 scripts/android-config.py
       - run: npx cap sync android
       - working-directory: android
-        run: ./gradlew assembleDebug assembleRelease --no-daemon
+        run: ./gradlew assembleDebug assembleRelease bundleRelease --no-daemon
       - uses: actions/upload-artifact@v4
         with:
           name: ZAMAKAN-android-debug
@@ -65,6 +65,27 @@ jobs:
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
+      - name: Check Android App Bundle structure
+        run: |
+          test -s android/app/build/outputs/bundle/release/app-release.aab
+          unzip -t android/app/build/outputs/bundle/release/app-release.aab
+          unzip -l android/app/build/outputs/bundle/release/app-release.aab | grep 'base/manifest/AndroidManifest.xml'
+      - name: Rehearse AAB signing using disposable CI key (not for distribution)
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          export CI_TEMP_PASS="$(openssl rand -hex 24)"
+          keytool -genkeypair -alias ci-only -keyalg RSA -keysize 3072 -validity 1 -dname 'CN=EPHEMERAL CI TEST ONLY' -keystore "$work/test.p12" -storepass:env CI_TEMP_PASS -keypass:env CI_TEMP_PASS
+          cp android/app/build/outputs/bundle/release/app-release.aab "$work/test.aab"
+          jarsigner -keystore "$work/test.p12" -storepass:env CI_TEMP_PASS -keypass:env CI_TEMP_PASS -digestalg SHA-256 "$work/test.aab" ci-only
+          jarsigner -verify "$work/test.aab" | tee "$work/result.txt"
+          grep -q 'jar verified' "$work/result.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZAMAKAN-google-play-aab-unsigned
+          path: android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
   windows:
     runs-on: windows-latest
     steps:

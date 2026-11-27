@@ -11,7 +11,7 @@ public class ZamakanPushPlugin extends Plugin {
     private static final String TOPIC="zamakan_research_updates";
     private boolean optedIn(){return getContext().getSharedPreferences("zamakan_push",Context.MODE_PRIVATE).getBoolean("opted_in",false);}
     private void opt(boolean value){getContext().getSharedPreferences("zamakan_push",Context.MODE_PRIVATE).edit().putBoolean("opted_in",value).apply();}
-    @PluginMethod public void status(PluginCall call){JSObject r=new JSObject();r.put("enabled",optedIn());call.resolve(r);}
+    @PluginMethod public void status(PluginCall call){JSObject r=new JSObject();r.put("enabled",optedIn());r.put("lastReceived",getContext().getSharedPreferences("zamakan_push",Context.MODE_PRIVATE).getLong("last_received",0));call.resolve(r);}
     @PluginMethod public void enable(PluginCall call){
         if(Build.VERSION.SDK_INT>=33 && getPermissionState("notifications")!=PermissionState.GRANTED){requestPermissionForAlias("notifications",call,"permissionResult");return;}
         subscribe(call);
