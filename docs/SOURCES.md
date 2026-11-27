@@ -13,9 +13,12 @@ All URLs used by the application are in src/data.js. HTTP probes returned 200 fo
 
 No independent proof of hazard impact zones, ground truth, numeric uncertainty or all-data spatial resolution supplied. Missing values stay blank. NOAA Kp is estimated and USGS magnitude is not a damage severity. EONET reported events are not hotspot counts. Source update timestamp and retrieval timestamp are distinct.
 
+| Open-Meteo Geocoding | https://open-meteo.com/en/docs/geocoding-api | GeoNames locations, WGS84 coordinates | Hosted usage terms as above; GeoNames attribution https://www.geonames.org/ ; requested on search submission |
+| NASA GIBS | https://www.earthdata.nasa.gov/data/tools/gibs | MODIS Terra true-color daily WMTS imagery up to level 9; availability varies by day/coverage | NASA EOSDIS attribution; public tile endpoint, no key required; no quota/SLA confirmed; test tile HTTP 200 image/jpeg |
+
 ## Deferred integrations
 NASA FIRMS: https://firms.modaps.eosdis.nasa.gov/api/ — requires MAP_KEY for many routes, hotspot product terms and quotas to verify.
-NASA GIBS: https://www.earthdata.nasa.gov/data/tools/gibs — imagery coverage, date, tile CRS and attribution to verify.
+NASA GIBS: more sensors, historical comparisons and full imagery coverage verification deferred.
 CelesTrak: https://celestrak.org/NORAD/documentation/gp-data-formats.php — TLE/OMM and SGP4 to implement and verify.
 Google 3D Tiles / Cesium ion / Mapbox: account, service terms and possible billing; no credentials requested or activated.
 ECMWF, WMO, CAP alert providers, CNEOS, NHC, GNSS TEC, AIS/ADS-B: not yet integrated.

@@ -55,3 +55,15 @@ export async function fetchSource(key,query='',fetcher=globalThis.fetch){
 export function distance(a,b){const r=Math.PI/180,dlat=(b.lat-a.lat)*r,dlon=(b.lon-a.lon)*r,x=Math.sin(dlat/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dlon/2)**2;return 6371.0088*2*Math.asin(Math.sqrt(Math.min(1,x)));}
 export function eventsAt(events,at){return events.filter(e=>Date.parse(e.time)<=at);}
 export function nearestHour(data,at){const hours=data?.hourly?.time;if(!hours?.length)return null;const i=hours.findIndex(t=>Date.parse(iso(t))>=at);return i<0?null:{time:iso(hours[i]),values:Object.fromEntries(Object.entries(data.hourly).filter(([k,v])=>k!=='time'&&Array.isArray(v)).map(([k,v])=>[k,v[i]]))};}
+export async function geocode(name,language='ar',fetcher=globalThis.fetch){
+ const q=String(name).trim();if(q.length<2||q.length>80)throw Error('Invalid search term');
+ const params=new URLSearchParams({name:q,count:'6',language:language==='ar'?'ar':'en',format:'json'});
+ const r=await fetcher('https://geocoding-api.open-meteo.com/v1/search?'+params,{credentials:'omit',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(18000)});
+ if(!r.ok)throw Error('Geocode HTTP '+r.status);
+ const d=await r.json();if(d.error)throw Error('Geocode API error');
+ return (d.results||[]).filter(x=>validCoords(x.longitude,x.latitude)).map(x=>({name:String(x.name),country:String(x.country||x.country_code||''),admin:String(x.admin1||''),lon:x.longitude,lat:x.latitude}));
+}
+export function gibsTiles(day){
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!iso(day+'T00:00:00Z')||day>new Date().toISOString().slice(0,10)||day<'2000-02-24')throw Error('Invalid imagery date');
+ return ['https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/'+day+'/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg'];
+}
