@@ -15,7 +15,7 @@ try{
 try{await authorizeMapTiler(config.mapTilerPublicKey,{fetcher:(url,options)=>fetch(url,{...options,headers})});}catch{fail('MapTiler satellite');}
 try{
  const token=ionToken(config.cesiumPublicToken),r=await fetch('https://api.cesium.com/v1/assets/2275207/endpoint',{headers:{...headers,Authorization:'Bearer '+token},signal:AbortSignal.timeout(12000),redirect:'error'});
- if(!r.ok)fail('Cesium');const d=await r.json();if(!d.url)fail('Cesium');
+ if(!r.ok)fail('Cesium');const d=await r.json();if(!(d.externalType==='3DTILES'?d.options?.url:d.url))fail('Cesium');
 }catch{fail('Cesium photorealistic');}
 try{
  const endpoint=base+'/api/weather/weather?latitude=40.7484&longitude=-73.9857&current=temperature_2m&timezone=GMT';
