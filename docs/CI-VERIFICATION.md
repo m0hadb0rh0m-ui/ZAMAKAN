@@ -11,6 +11,11 @@ Run: https://github.com/m0hadb0rh0m-ui/ZAMAKAN/actions/runs/45995363175
 - Web artifact: https://github.com/m0hadb0rh0m-ui/ZAMAKAN/actions/runs/45995363175/artifacts/15195493070
 - No physical-device installation, GPS permission verification, app-store signing, WCAG conformance or safety certification performed.
 
-Updated code including geocoding and NASA GIBS is commit `f44896295e167872719c33918355fb28526c5bfa`; local production build and 12 unit tests passed. Its independent build run: https://github.com/m0hadb0rh0m-ui/ZAMAKAN/actions/runs/45995602954 (in progress when recorded).
+Updated code including geocoding and NASA GIBS is commit `f44896295e167872719c33918355fb28526c5bfa`; local production build and 12 unit tests passed. Its independent build run: https://github.com/m0hadb0rh0m-ui/ZAMAKAN/actions/runs/45995602954 (completed successfully, both web and Android jobs).
 
 This report supplements the earlier local-environment limitations in DELIVERY.md. No billing or external deployment activated.
+
+## Latest build verified
+- Android debug APK zip: https://github.com/m0hadb0rh0m-ui/ZAMAKAN/actions/runs/45995602954/artifacts/15196076060
+- Web package: https://github.com/m0hadb0rh0m-ui/ZAMAKAN/actions/runs/45995602954/artifacts/15194999308
+- Chromium smoke test passed again, with no page errors. USGS, EONET, NOAA available; Open-Meteo still connecting at smoke screenshot time (previous first build showed it available). New geocoding and GIBS endpoints verified by HTTP and unit tests; their on-screen interactions have not been specifically exercised in E2E.
