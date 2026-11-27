@@ -52,3 +52,14 @@ never put the values in a source file or a GitHub issue. They are intentionally
 restricted public credentials, observable in provider network requests; never
 use a private/admin token. See OWNER-PROVIDERS.md. The signed Android release
 requires HTTPS backend configuration and signing secrets separately.
+
+## Verification of this increment
+Live limited two-lead imports succeeded for IFS, AIFS Single, NOAA GFS and
+ECMWF Wave; the full nine-lead recurring run has not been certified. AIFS cloud
+cover units and wave bitmap/missing-value handling were verified on a second
+live sample. The Node weather endpoint returned real grid values and gzip
+compressed global frames. 47 Node tests and commercial Vite build passed.
+Chromium rendered a live IFS snapshot and animated its wind vectors without
+uncaught JS exceptions on an isolated fixture base style (not a live map tile
+or physical Android test). CAMS input is untested with live licensed data.
+The external deployment and scheduler are still owner acceptance gates.

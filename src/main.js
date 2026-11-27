@@ -96,7 +96,7 @@ $('globalWeather').onclick=async()=>{
  $('weatherLayerStatus').textContent=tr('تحميل شبكة التوقعات العالمية…','Loading global forecast…');
  try{const d=await loadGlobalForecast(WEATHER_BASE,$('globalModel').value,state.at,ctl.signal);if(ctl.signal.aborted)return;
  weatherGridData=null;globalForecast=d;state.mode='flat';state.buildings=false;map.setProjection({type:'mercator'});setBuildings(map,false);map.easeTo({zoom:Math.min(map.getZoom(),3),pitch:0,duration:motion()});syncWeatherGrid();renderChrome();
- }catch{if(!ctl.signal.aborted)$('weatherLayerStatus').textContent=tr('لا توجد شبكة توقعات جاهزة','No forecast snapshot available');}
+ }catch(e){console.warn('Global forecast rendering failed',e?.message);if(!ctl.signal.aborted)$('weatherLayerStatus').textContent=tr('لا توجد شبكة توقعات جاهزة','No forecast snapshot available');}
  finally{if(globalAbort===ctl)$('globalWeather').disabled=false;}
 };
 $('weatherGrid').onclick=async()=>{

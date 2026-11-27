@@ -32,8 +32,7 @@ export function renderGlobal(map,data,field){
   for(let y=0;y<canvas.height;y++){const lat=inverseMercator(Math.PI*(1-2*(y+.5)/canvas.height));
    for(let x=0;x<canvas.width;x++){const v=forecastValue(data,field,west+(east-west)*(x+.5)/canvas.width,lat);if(v!==null)image.data.set([...surfaceColor(field,v),205],(y*canvas.width+x)*4);}}
   ctx.putImageData(image,0,0);const id=ID+suffix,n=inverseMercator(Math.PI);
-  map.addSource(id,{type:'image',coordinates:[[west,n],[east,n],[east,-n],[west,-n]],attribution:data.model==='gfs'?'NOAA GFS forecast':'ECMWF forecast · CC BY 4.0'});
-  map.getSource(id).updateImage({image:canvas});
+  map.addSource(id,{type:'image',url:canvas.toDataURL('image/png'),coordinates:[[west,n],[east,n],[east,-n],[west,-n]],attribution:data.model==='gfs'?'NOAA GFS forecast':'ECMWF forecast · CC BY 4.0'});
   map.addLayer({id,type:'raster',source:id,paint:{'raster-opacity':.65,'raster-fade-duration':0}},map.getLayer('quakes')?'quakes':undefined);
  }
  return true;
