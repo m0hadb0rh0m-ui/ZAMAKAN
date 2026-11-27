@@ -85,3 +85,8 @@ test-certificate release signing; test artifact is NOT a production signing key.
 GitHub manual workflow registration requires the workflow to exist on the
 default branch. Review/merge the pull request before dispatching the commercial
 workflow; the development branch is deliberately not merged automatically.
+
+Browser acceptance additionally confirmed the live NYC response (HTTP 200) at
+the public landmark coordinate and displayed 377.6 m, official record link,
+geometry source and last edit date in the actual selection card, with no uncaught
+JavaScript errors. See [the actual capture](screenshots/municipal-height.jpg).

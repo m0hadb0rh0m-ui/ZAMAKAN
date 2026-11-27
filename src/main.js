@@ -149,15 +149,16 @@ async function reverseSelected(){
  try{const [x]=await searchPlaces('',{language:state.lang,position:pos,reverse:true,signal:reverseAbort.signal});if(state.position!==pos)return;state.place=x||null;renderChrome();notice(x?'':tr('لا يوجد عنوان مسجل لهذه النقطة','No mapped address at this point'));}catch{if(state.position===pos)notice(tr('تعذر استرجاع العنوان','Address lookup unavailable'));}
 }
 let heightAbort;
+const canInspectHeight=place=>['building','coordinate','address','poi'].includes(place?.type);
 async function inspectHeight(){
- const selected=state.place,pos=state.position;if(selected?.type!=='building')return;
+ const selected=state.place,pos=state.position;if(!canInspectHeight(selected))return;
  heightAbort?.abort();const ctl=new AbortController();heightAbort=ctl;selected.heightState='loading';renderChrome();
  try{const result=await lookupHeight(pos.lon,pos.lat,selected.renderHeight,{signal:ctl.signal});if(state.place!==selected||ctl.signal.aborted)return;selected.height=result;selected.heightState='done';}
  catch{if(ctl.signal.aborted||state.place!==selected)return;selected.heightState='failed';}
  renderChrome();
 }
 function heightCard(place){
- if(place?.type!=='building')return '';
+ if(!canInspectHeight(place))return '';
  const h=place.height;let detail='';
  if(place.heightState==='loading')detail=tr('جارٍ التحقق…','Checking building source…');
  else if(place.heightState==='failed')detail=tr('تعذر الوصول إلى المصدر؛ الارتفاع غير موثّق.','Source unavailable; height remains unverified.');
