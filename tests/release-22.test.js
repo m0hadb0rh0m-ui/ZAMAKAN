@@ -24,3 +24,11 @@ test('fixed international registry and accurate cache status',async()=>{
  const f=await readAlertFeed('om',async()=>new Response('<rss><channel/></rss>'));assert.equal(f.state,'fresh');
  const c=await readAlertFeed('om',()=>{throw Error('must not request')});assert.equal(c.state,'cached');
 });
+
+test('CAP proxy rejects HTML and cross-origin redirects; allows bounded same-origin HTTPS redirects',async()=>{
+ await assert.rejects(readAlertFeed('au',async()=>new Response('<html>not a feed</html>')),/Unexpected feed/);
+ await assert.rejects(readAlertFeed('de',async()=>new Response(null,{status:302,headers:{location:'https://example.com/other'}})),/Untrusted redirect/);
+ let hits=0;
+ const r=await readAlertFeed('in',async()=>++hits===1?new Response(null,{status:302,headers:{location:'/rss.xml'}}):new Response('<?xml version="1.0"?><rss><channel/></rss>'));
+ assert.equal(hits,2);assert.equal(r.state,'fresh');
+});

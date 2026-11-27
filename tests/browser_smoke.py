@@ -119,9 +119,13 @@ with sync_playwright() as p:
  assert page.locator('.guide-feature').count()==12
  assert page.get_by_text('Start exploring ZAMAKAN',exact=True).is_visible()
  assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
- page.locator('#lang').click()
+ page.locator('#settings').click()
+ page.get_by_label('Application language').select_option('ar')
+ page.get_by_role('button',name='إغلاق',exact=True).click()
  assert page.get_by_text('ابدأ رحلتك في زَمَكان',exact=True).is_visible()
- page.locator('#lang').click()
+ page.locator('#settings').click()
+ page.get_by_label('لغة التطبيق').select_option('en')
+ page.get_by_role('button',name='Close',exact=True).click()
  go('earth')
  print(json.dumps({'browser':'Chromium','checks':'globe canvas, projection controls, RTL/LTR, timeline, FFT worker, grid particles and comparison (fixtures), imported 3D building, CAP XML and feed (fixture), AI disabled state, language settings, text sizes, map focus, mobile overflow','page_errors':errors,'status':page.locator('#panel').inner_text()[:1000]},ensure_ascii=False))
  assert not errors, errors

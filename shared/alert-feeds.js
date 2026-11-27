@@ -19,10 +19,18 @@ export async function readAlertFeed(id,fetcher=fetch){
  const f=ALERT_FEEDS[id],old=cached.get(id);
  if(old&&Date.now()-old.retrieved<120000)return {...old,state:'cached'};
  if(pending.has(id))return pending.get(id);
- const task=(async()=>{const r=await fetcher(f.url,{redirect:'error',credentials:'omit',headers:{Accept:'application/atom+xml, application/rss+xml, application/xml, text/xml'},signal:AbortSignal.timeout(12000)});
+ const task=(async()=>{const origin=new URL(f.url).origin,signal=AbortSignal.timeout(12000);let url=f.url,r;
+ for(let hops=0;hops<=3;hops++){
+  r=await fetcher(url,{redirect:'manual',credentials:'omit',headers:{Accept:'application/atom+xml, application/rss+xml, application/xml, text/xml'},signal});
+  if(![301,302,303,307,308].includes(r.status))break;
+  const target=r.headers.get('location');await r.body?.cancel().catch(()=>{});
+  if(!target||hops===3)throw Error('Redirect limit');
+  const next=new URL(target,url);if(next.origin!==origin||next.username||next.password)throw Error('Untrusted redirect');
+  url=next.href;
+ }
  if(!r.ok||!r.body)throw Error('Upstream unavailable');
  const reader=r.body.getReader(),chunks=[];let size=0;try{while(true){const v=await reader.read();if(v.done)break;size+=v.value.length;if(size>750000)throw Error('Feed exceeds limit');chunks.push(v.value);}}finally{await reader.cancel().catch(()=>{});}
  const b=new Uint8Array(size);let offset=0;for(const a of chunks){b.set(a,offset);offset+=a.length;}
- const xml=new TextDecoder().decode(b);if(/<!DOCTYPE|<!ENTITY/i.test(xml)||!/^\s*(?:<\?xml[^>]*>\s*)?</.test(xml))throw Error('Unexpected feed');const out={source:f.name,sourceUrl:f.url,registry:f.registry,retrieved:Date.now(),state:'fresh',xml};cached.set(id,out);return out;})().catch(e=>{if(old)return {...old,state:'stale',error:'Upstream unavailable'};throw e;}).finally(()=>pending.delete(id));
+ const xml=new TextDecoder().decode(b);if(/<!DOCTYPE|<!ENTITY/i.test(xml)||!/^\s*(?:<\?xml[^>]*>\s*)?(?:<!--[\s\S]*?-->\s*)*<(?:[\w.-]+:)?(?:rss|feed)(?:\s|>)/i.test(xml))throw Error('Unexpected feed');const out={source:f.name,sourceUrl:f.url,registry:f.registry,retrieved:Date.now(),state:'fresh',xml};cached.set(id,out);return out;})().catch(e=>{if(old)return {...old,state:'stale',error:'Upstream unavailable'};throw e;}).finally(()=>pending.delete(id));
  pending.set(id,task);return task;
 }

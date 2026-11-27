@@ -72,20 +72,21 @@ jobs:
         run: npm ci
       - working-directory: desktop
         env:
-          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
         shell: pwsh
         run: |
-          if (-not $env:WIN_CSC_LINK -or -not $env:WIN_CSC_KEY_PASSWORD) { throw 'Trusted Windows signing credentials required' }
+          if (-not $env:CSC_LINK -or -not $env:CSC_KEY_PASSWORD) { throw 'Trusted Windows signing credentials required' }
           npm run package:win -- --config.forceCodeSigning=true
           if ($LASTEXITCODE -ne 0) { throw 'Packaging failed' }
           $files=Get-ChildItem release/*.exe
           if (-not $files) { throw 'No signed executable' }
+          $files += Get-Item release/win-unpacked/ZAMAKAN.exe
           foreach ($file in $files) {
             $s=Get-AuthenticodeSignature $file.FullName
-            if ($s.Status -ne 'Valid') { throw "Untrusted signature: $($s.Status)" }
+            if ($s.Status -ne 'Valid' -or -not $s.TimeStamperCertificate) { throw "Missing trusted timestamp or signature: $($s.Status)" }
           }
-          $files | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" } | Set-Content release/SHA256SUMS.txt
+          Get-ChildItem release/*.exe | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" } | Set-Content release/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: ZAMAKAN-windows-signed
